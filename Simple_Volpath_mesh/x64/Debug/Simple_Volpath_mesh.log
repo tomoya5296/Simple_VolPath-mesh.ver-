@@ -1,0 +1,4 @@
+﻿  main.cpp
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(464): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
+  Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\x64\Debug\Simple_Volpath_mesh.exe
+  Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\x64\Debug\Simple_Volpath_mesh.pdb (Partial PDB)

@@ -22,7 +22,7 @@
 #include "random.h"
 #include "TRIANGLE.h"
 #include"tiny_obj_loader.h"
-#include <vector>
+
 
 
 
@@ -49,15 +49,16 @@ Material cokeMat(Color(0.0), Color(0.999), TRANSLUCENT, cokeMedium);
 const int LightID = 0;
 std::vector<std::string> objList =
 {
-	"light_plane.obj","left_plane.obj","right_plane.obj","up_plane.obj","bottom_plane.obj","far_plane.obj","box_front.obj"
+	"light_plane.obj","left_plane.obj","right_plane.obj","up_plane.obj","bottom_plane.obj","far_plane.obj","box_left.obj","box_right.obj"
 };
 //const int objTotal = objList.size;
 
 
 
+//std::vector<std::vector <TRIANGLE>>triangles;
 
 
-TRIANGLE triangles[7][12];//TODO 必要な数だけ用意するためにはどうしよう？動的配列だと遅いから静的配列にしたい
+TRIANGLE triangles[8][12];//TODO 必要な数だけ用意するためにはどうしよう？動的配列だと遅いから静的配列にしたい
 
 
 
@@ -438,6 +439,9 @@ inline void progressBar(int x, int total, int width = 50) {
 
 //必ずlightは0盤目に読み込む
 inline void objectload(int i , std::vector<std::string> strList) {
+	
+	//triangles = std::vector<std::vector<TRIANGLE>>(8, std::vector<TRIANGLE>(12));
+	
 	std::string inputfile = strList[i];
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -503,7 +507,10 @@ inline void objectload(int i , std::vector<std::string> strList) {
 								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 							else if (i == 6) {
-								triangles[i][f].mat = milkMat;//TODO 各オブジェクトについて変更できるようにする
+								triangles[i][f].mat = mirrorMat;//TODO 各オブジェクトについて変更できるようにする
+							}
+							else if (i == 7) {
+								triangles[i][f].mat = greenMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 							
 			}
@@ -540,8 +547,8 @@ int main(int argc, char **argv) {
 	// コマンド引数のパース
 	int width = 640;
 	int height = 480;
-	int samples = 1000;
-	int maxDepth = 100;
+	int samples = 2;
+	int maxDepth = 10;
 	/*for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--width") == 0) {
 			width = std::atoi(argv[++i]);
