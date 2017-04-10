@@ -54,6 +54,9 @@
     <ClInclude Include="..\src\Vec.h">
       <Filter>ソース ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\bvh.h">
+      <Filter>ソース ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\main.cpp">

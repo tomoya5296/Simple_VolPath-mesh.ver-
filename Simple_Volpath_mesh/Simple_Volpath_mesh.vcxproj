@@ -22,7 +22,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{0F25974F-D90B-4E82-BBFD-27032322D049}</ProjectGuid>
     <RootNamespace>Simple_Volpath_mesh</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -111,6 +111,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\src\bvh.h" />
     <ClInclude Include="..\src\common.h" />
     <ClInclude Include="..\src\dirs.h" />
     <ClInclude Include="..\src\intersect.h" />
