@@ -28,7 +28,6 @@
 
 
 
-
 // 媒質のリスト
 Medium milkMedium(Color(4.5513, 5.8294, 7.136), Color(0.0015333, 0.0046, 0.019933), 1.3);
 Medium cokeMedium(Color(8.9053e-05, 8.372e-05, 0) * 1.0, Color(0.10014, 0.16503, 0.2468) * 1.0, 1.3);
@@ -55,22 +54,19 @@ std::vector<std::string> objList =
 
 
 
-//std::vector<std::vector <TRIANGLE>>triangles;
+std::vector<std::vector <TRIANGLE>>triangles;
 
-
-TRIANGLE triangles[8][12];//TODO 必要な数だけ用意するためにはどうしよう？動的配列だと遅いから静的配列にしたい
+//TRIANGLE triangles[8][12];//TODO 必要な数だけ用意するためにはどうしよう？動的配列だと遅いから静的配列にしたい
 
 
 
 
 //シーンとの交差判定関数(三角形ver)
 inline bool intersect_scene_triangle(const Ray &ray, Intersection  *intersection) {
-	
 	intersection->hitpoint.distance = INF;
 
 	for(int j=0;j<objList.size();j++){
-		const int n = sizeof(triangles[j]) / sizeof(TRIANGLE);
-
+		const int n = triangles[j].size();//sizeof TRIANGLE;
 		for (int i = 0; i < int(n); i++) {
 
 			Hitpoint hitpoint;
@@ -211,7 +207,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	const Vec orienting_normal = Dot(intersection.hitpoint.normal, ray.dir) < 0.0 ? intersection.hitpoint.normal : (-1.0 * intersection.hitpoint.normal); // 交差位置の法線（物体からのレイの入出を考慮）
 	const Vec hitpoint = ray.org +(intersection.hitpoint.distance)* ray.dir;//ok
 
-	//return obj.mat.ref/t;
+	
 
 	// 最大のbounce数を評価
 	if (depth >= maxDepth) {
@@ -439,9 +435,7 @@ inline void progressBar(int x, int total, int width = 50) {
 
 //必ずlightは0盤目に読み込む
 inline void objectload(int i , std::vector<std::string> strList) {
-	
-	//triangles = std::vector<std::vector<TRIANGLE>>(8, std::vector<TRIANGLE>(12));
-	
+
 	std::string inputfile = strList[i];
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -462,10 +456,9 @@ inline void objectload(int i , std::vector<std::string> strList) {
 	for (size_t s = 0; s < shapes.size(); s++) {
 		// Loop over faces(polygon)
 		int  face_number = shapes[s].mesh.num_face_vertices.size();
-
-
+		triangles[i].resize(face_number);
 		size_t index_offset = 0;
-
+	
 		for (size_t f = 0; f < face_number; f++) {
 			int fv = shapes[s].mesh.num_face_vertices[f];
 			// Loop over vertices in the face.
@@ -487,7 +480,6 @@ inline void objectload(int i , std::vector<std::string> strList) {
 
 				triangles[i][f].v[ve] = vertex;
 				triangles[i][f].n[ve] = normal;
-				
 							if (i == 0) {
 								triangles[i][f].mat = lightMat;//TODO 各オブジェクトについて変更できるようにする
 							}
@@ -536,6 +528,10 @@ inline void objectload(int i , std::vector<std::string> strList) {
 
 // メイン関数
 int main(int argc, char **argv) {
+
+
+	triangles.resize(objList.size());
+
 	
 	//scene
 	for (int i = 0; i < objList.size(); i++) {
@@ -544,12 +540,13 @@ int main(int argc, char **argv) {
 	
 
 
+
 	// コマンド引数のパース
 	int width = 640;
 	int height = 480;
 	int samples = 2;
 	int maxDepth = 10;
-	/*for (int i = 1; i < argc; i++) {
+	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--width") == 0) {
 			width = std::atoi(argv[++i]);
 		}
@@ -566,7 +563,7 @@ int main(int argc, char **argv) {
 			maxDepth = std::atoi(argv[++i]);
 		}
 	}
-*/
+
 	// パラメータの表示
 	printf("-- Parameters --\n");
 	printf("    Width: %d\n", width);
@@ -589,6 +586,7 @@ int main(int argc, char **argv) {
 	std::atomic<int> progress(0);
 	std::mutex mtx;
 	parallel_for(0, height, [&](int y) {
+	//for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			// 乱数
 			Random rng(y * width + x);
@@ -623,6 +621,7 @@ int main(int argc, char **argv) {
 			progressBar(++progress, width * height);
 			mtx.unlock();
 		}
+	//}
 	});
 
 	// PPMファイルを保存
