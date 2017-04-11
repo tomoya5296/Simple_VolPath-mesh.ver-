@@ -12,6 +12,9 @@
 #include <atomic>
 #include <mutex>
 #include<list>
+#include<vector>
+#include<algorithm>
+#include <iomanip>
 #include "common.h"
 #include "dirs.h"
 #include "parallel.h"
@@ -22,7 +25,7 @@
 #include "random.h"
 #include "TRIANGLE.h"
 #include"tiny_obj_loader.h"
-
+#include "bvh.h"
 
 
 
@@ -30,9 +33,10 @@
 
 
 // 媒質のリスト
-Medium milkMedium(Color(4.5513, 5.8294, 7.136), Color(0.0015333, 0.0046, 0.019933), 1.3);
+//Medium milkMedium(Color(4.5513, 5.8294, 7.136), Color(0.0015333, 0.0046, 0.019933), 1.3);
+Medium milkMedium (Color (0.45513, 0.58294, 0.7136), Color(0.00015333, 0.00046, 0.0019933), 1.3);
 Medium cokeMedium(Color(8.9053e-05, 8.372e-05, 0) * 1.0, Color(0.10014, 0.16503, 0.2468) * 1.0, 1.3);
-
+Medium diamondMedium(Color(EPS,EPS,EPS) * 1.0, Color(EPS,EPS,EPS) * 1.0, 1.5);
 // マテリアルのリスト
 Material lightMat(Color(36.0), Color(0.0), DIFFUSE);//TODO弱めた
 Material grayMat(Color(0.0), Color(0.75), DIFFUSE);
@@ -43,25 +47,15 @@ Material mirrorMat(Color(0.0), Color(0.999), SPECULAR);
 Material glassMat(Color(0.0), Color(0.999), REFRACTION);
 Material milkMat(Color(0.0), Color(0.999), TRANSLUCENT, milkMedium);
 Material cokeMat(Color(0.0), Color(0.999), TRANSLUCENT, cokeMedium);
-
+Material diamondMat(Color(0.0), Color(0.999), REFRACTION,diamondMedium);
 
 // シーンの補助情報
 const int LightID = 0;
 std::vector<std::string> objList =
 {
-	"light_plane.obj","left_plane.obj","right_plane.obj","up_plane.obj","bottom_plane.obj","far_plane.obj","box_left.obj","box_right.obj"
+	"bunny.obj"
 };
-//const int objTotal = objList.size;
-
-
-
-//std::vector<std::vector <TRIANGLE>>triangles;
-
-
-TRIANGLE triangles[8][12];//TODO 必要な数だけ用意するためにはどうしよう？動的配列だと遅いから静的配列にしたい
-
-
-
+std::vector<std::vector <TRIANGLE>>triangles;
 
 //シーンとの交差判定関数(三角形ver)
 inline bool intersect_scene_triangle(const Ray &ray, Intersection  *intersection) {
@@ -69,7 +63,7 @@ inline bool intersect_scene_triangle(const Ray &ray, Intersection  *intersection
 	intersection->hitpoint.distance = INF;
 
 	for(int j=0;j<objList.size();j++){
-		const int n = sizeof(triangles[j]) / sizeof(TRIANGLE);
+		const int n = triangles[j].size();
 
 		for (int i = 0; i < int(n); i++) {
 
@@ -201,7 +195,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 		return Color(0.0);
 	}
 	
-	
+
 
 	const double t = intersection.hitpoint.distance;//ok
 	const int obj_id = intersection.obj_id;
@@ -211,7 +205,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	const Vec orienting_normal = Dot(intersection.hitpoint.normal, ray.dir) < 0.0 ? intersection.hitpoint.normal : (-1.0 * intersection.hitpoint.normal); // 交差位置の法線（物体からのレイの入出を考慮）
 	const Vec hitpoint = ray.org +(intersection.hitpoint.distance)* ray.dir;//ok
 
-	//return obj.mat.ref/t;
+	return obj.mat.ref/t;
 
 	// 最大のbounce数を評価
 	if (depth >= maxDepth) {
@@ -321,7 +315,71 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 			return direct_light +
 			Multiply(transmittance_ratio, radiance(Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir)), medium, rng, depth + 1, maxDepth)) / (1.0 - scattering_probability) / russian_roulette_probability;
 		} break;
-		case REFRACTION: {}break;
+		case REFRACTION: {			Ray reflection_ray = Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir));
+
+			// 反射方向からの直接光サンプリングする
+			Intersection lintersect;
+			intersect_scene_triangle(reflection_ray, &lintersect);
+			Vec direct_light;
+			if (lintersect.obj_id == LightID) {
+				direct_light = direct_radiance(hitpoint, orienting_normal, obj_id, tri_num, reflection_ray.org + lintersect.hitpoint.distance * reflection_ray.dir, lintersect);
+			}
+			bool into = Dot(normal, orienting_normal) > 0.0; // レイがオブジェクトから出るのか、入るのか、出るならばfalse
+
+															 // Snellの法則
+			const double nc = 1.0; // 真空の屈折率
+			const double nt = 1.3; // オブジェクトの屈折率
+			const double nnt = into ? nc / nt : nt / nc;
+			const double ddn = Dot(ray.dir, orienting_normal);
+			const double cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
+
+			if (cos2t < 0.0) { // 全反射した
+				return direct_light + Multiply(transmittance_ratio, Multiply(obj.mat.ref, (radiance(reflection_ray, medium, rng, depth + 1, maxDepth)))) / (1.0 - scattering_probability) / russian_roulette_probability;
+			}
+			// 屈折していく方向
+			Vec tdir = Normalize(ray.dir * nnt - normal * (into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t)));
+
+			// SchlickによるFresnelの反射係数の近似
+			const double a = nt - nc, b = nt + nc;
+			const double R0 = (a * a) / (b * b);
+			const double c = 1.0 - (into ? -ddn : Dot(tdir, normal));
+			const double Re = R0 + (1.0 - R0) * pow(c, 5.0);
+			const double Tr = 1.0 - Re; // 屈折光の運ぶ光の量
+			const double probability = 0.25 + 0.5 * Re;
+
+			// 屈折方向からの直接光サンプリングする
+			Ray refraction_ray = Ray(hitpoint, tdir);
+			intersect_scene_triangle(refraction_ray, &lintersect);
+			Vec direct_light_refraction;
+			if (lintersect.obj_id == LightID) {
+				direct_light_refraction = direct_radiance(hitpoint, -1.0 * orienting_normal, obj_id, tri_num, refraction_ray.org + lintersect.hitpoint.distance * refraction_ray.dir, lintersect);
+			}
+
+			// 一定以上レイを追跡したら屈折と反射のどちらか一方を追跡する。（さもないと指数的にレイが増える）
+			// ロシアンルーレットで決定する。
+			if (rng.next01() < probability) { // 反射
+				return direct_light +
+					Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(reflection_ray, medium, rng, depth + 1, maxDepth) * Re))
+					/ probability
+					/ (1.0 - scattering_probability)
+					/ russian_roulette_probability;
+			}
+			else { // 屈折
+				//   // もし半透明物体ならmediumが変化
+				//Medium next_medium = medium;
+				//if (obj.mat.type == TRANSLUCENT && into) {
+				//	next_medium = triangles[obj_id][tri_num].mat.medium;
+				//}
+				//else if (obj.mat.type == TRANSLUCENT && !into) {
+				//	next_medium = Medium();
+				//}
+
+				return direct_light_refraction +
+					Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(Ray(hitpoint, tdir), medium, rng, depth + 1, maxDepth) * Tr))
+					/ (1.0 - probability)
+					/ (1.0 - scattering_probability)
+					/ russian_roulette_probability;
+			}}break;
 		case TRANSLUCENT: {
 			Ray reflection_ray = Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir));
 
@@ -422,6 +480,36 @@ void save_ppm_file(const std::string &filename, const Color *image, const int wi
 	writer.close();
 }
 
+void save_box_obj_blender_file(const std::string &filename,Vec *v) {
+	std::ofstream writer(filename.c_str(), std::ios::out);
+	writer << "# Blender v2.78 (sub 0) OBJ File: ''# www.blender.orgo Cube\n";
+
+	for (int i = 0; i <8 ; i++) {
+		writer << "v" << " " << std::fixed << std::setprecision(5) << (float)(v[i].x) << " " << std::fixed << std::setprecision(5) << (float)(v[i].y) << " " << std::fixed << std::setprecision(5) << (float)(v[i].z) << std::endl;
+	}
+	
+	writer << "vn -1.0000 0.0000 0.0000" << std::endl;
+	writer << "vn 0.0000 0.0000 -1.0000" << std::endl;
+		writer<< "vn 1.0000 0.0000 0.0000" << std::endl; 
+		writer<<"vn 0.0000 0.0000 1.0000" << std::endl; 
+		writer << "vn 0.0000 -1.0000 0.0000"<< std::endl; 
+		writer << "vn 0.0000 1.0000 0.0000"<<std::endl;
+		writer << "s off" << std::endl;
+		writer << "f 2//1 3//1 1//1" << std::endl;
+		writer << "f 4//2 7//2 3//2" << std::endl;
+		writer << "f 8//3 5//3 7//3" << std::endl;
+		writer << "f 6//4 1//4 5//4" << std::endl;
+		writer << "f 7//5 1//5 3//5" << std::endl;
+		writer << "f 4//6 6//6 8//6" << std::endl;
+		writer << "f 2//1 4//1 3//1" << std::endl;
+		writer << "f 4//2 8//2 7//2" << std::endl;
+		writer << "f 8//3 6//3 5//3" << std::endl;
+		writer << "f 6//4 2//4 1//4" << std::endl;
+		writer << "f 7//5 5//5 1//5" << std::endl;
+		writer << "f 4//6 2//6 6//6" ;
+	writer.close();
+}
+
 // 進行度を表示するメソッド
 inline void progressBar(int x, int total, int width = 50) {
 	double ratio = (double)x / total;
@@ -439,8 +527,6 @@ inline void progressBar(int x, int total, int width = 50) {
 
 //必ずlightは0盤目に読み込む
 inline void objectload(int i , std::vector<std::string> strList) {
-	
-	//triangles = std::vector<std::vector<TRIANGLE>>(8, std::vector<TRIANGLE>(12));
 	
 	std::string inputfile = strList[i];
 	tinyobj::attrib_t attrib;
@@ -462,7 +548,7 @@ inline void objectload(int i , std::vector<std::string> strList) {
 	for (size_t s = 0; s < shapes.size(); s++) {
 		// Loop over faces(polygon)
 		int  face_number = shapes[s].mesh.num_face_vertices.size();
-
+		triangles[i].resize(face_number);
 
 		size_t index_offset = 0;
 
@@ -488,32 +574,36 @@ inline void objectload(int i , std::vector<std::string> strList) {
 				triangles[i][f].v[ve] = vertex;
 				triangles[i][f].n[ve] = normal;
 				
+
 							if (i == 0) {
-								triangles[i][f].mat = lightMat;//TODO 各オブジェクトについて変更できるようにする
-							}
-							else if(i==1){
-								triangles[i][f].mat =redMat;//TODO 各オブジェクトについて変更できるようにする
-							}
-							else if (i == 2) {
 								triangles[i][f].mat = blueMat;//TODO 各オブジェクトについて変更できるようにする
 							}
-							else if (i == 3) {
-								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
-							}
-							else if (i == 4) {
-								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
-							}
-							else if (i == 5) {
-								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
-							}
-							else if (i == 6) {
-								triangles[i][f].mat = mirrorMat;//TODO 各オブジェクトについて変更できるようにする
-							}
-							else if (i == 7) {
-								triangles[i][f].mat = greenMat;//TODO 各オブジェクトについて変更できるようにする
-							}
-							
+							//else if(i==1){
+							//	triangles[i][f].mat =redMat;//TODO 各オブジェクトについて変更できるようにする
+							//}
+							//else if (i == 2) {
+							//	triangles[i][f].mat = blueMat;//TODO 各オブジェクトについて変更できるようにする
+							//}
+							//else if (i == 3) {
+							//	triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
+							//}
+							//else if (i == 4) {
+							//	triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
+							//}
+							//else if (i == 5) {
+							//	triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
+							//}
+							//else if (i == 6) {
+							//	triangles[i][f].mat = diamondMat;//TODO 各オブジェクトについて変更できるようにする
+							//}
 			}
+
+			triangles[i][f].bbox[0][0] = std::min(std::min(triangles[i][f].v[0].x, triangles[i][f].v[1].x), triangles[i][f].v[2].x);
+			triangles[i][f].bbox[0][1] = std::min(std::min(triangles[i][f].v[0].y, triangles[i][f].v[1].y), triangles[i][f].v[2].y);
+			triangles[i][f].bbox[0][2] = std::min(std::min(triangles[i][f].v[0].z, triangles[i][f].v[1].z), triangles[i][f].v[2].z);
+			triangles[i][f].bbox[1][0] = std::max(std::max(triangles[i][f].v[0].x, triangles[i][f].v[1].x), triangles[i][f].v[2].x);
+			triangles[i][f].bbox[1][1] = std::max(std::max(triangles[i][f].v[0].y, triangles[i][f].v[1].y), triangles[i][f].v[2].y);
+			triangles[i][f].bbox[1][2] = std::max(std::max(triangles[i][f].v[0].z, triangles[i][f].v[1].z), triangles[i][f].v[2].z);
 			triangles[i][f].normal = Normalize(Cross((triangles[i][f].v[1]- triangles[i][f].v[0]), (triangles[i][f].v[2] - triangles[i][f].v[0])));
 			index_offset += fv;
 
@@ -537,18 +627,20 @@ inline void objectload(int i , std::vector<std::string> strList) {
 // メイン関数
 int main(int argc, char **argv) {
 	
+	triangles.resize(objList.size());
+
 	//scene
 	for (int i = 0; i < objList.size(); i++) {
 		objectload(i, objList);
 	}
 	
-
+	
 
 	// コマンド引数のパース
 	int width = 640;
 	int height = 480;
-	int samples = 2;
-	int maxDepth = 10;
+	int samples =  1;
+	int maxDepth = 1;
 	/*for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--width") == 0) {
 			width = std::atoi(argv[++i]);
@@ -588,44 +680,80 @@ int main(int argc, char **argv) {
 	auto image = std::make_unique<Color[]>(width * height);
 	std::atomic<int> progress(0);
 	std::mutex mtx;
-	parallel_for(0, height, [&](int y) {
-		for (int x = 0; x < width; x++) {
-			// 乱数
-			Random rng(y * width + x);
+	//parallel_for(0, height, [&](int y) {
+	//	for (int x = 0; x < width; x++) {
+	//		// 乱数
+	//		Random rng(y * width + x);
 
-			// ピクセル色の初期化
-			Color &pixel = image[y * width + x];
-			pixel = Color(0.0, 0.0, 0.0);
+	//		// ピクセル色の初期化
+	//		Color &pixel = image[y * width + x];
+	//		pixel = Color(0.0, 0.0, 0.0);
 
-			// サンプリング
-			for (int s = 0; s < samples; s++) {
-				// テントフィルターによってサンプリング
-				const double r1 = 2.0 * rng.next01();
-				const double r2 = 2.0 * rng.next01();
-				const double dx = r1 < 1.0 ? sqrt(r1) - 1.0 : 1.0 - sqrt(2.0 - r1);
-				const double dy = r2 < 1.0 ? sqrt(r2) - 1.0 : 1.0 - sqrt(2.0 - r2);
+	//		// サンプリング
+	//		for (int s = 0; s < samples; s++) {
+	//			// テントフィルターによってサンプリング
+	//			const double r1 = 2.0 * rng.next01();
+	//			const double r2 = 2.0 * rng.next01();
+	//			const double dx = r1 < 1.0 ? sqrt(r1) - 1.0 : 1.0 - sqrt(2.0 - r1);
+	//			const double dy = r2 < 1.0 ? sqrt(r2) - 1.0 : 1.0 - sqrt(2.0 - r2);
 
-				const double px = (x + dx + 0.5) / width - 0.5;
-				const double py = ((height - y - 1) + dy + 0.5) / height - 0.5;
+	//			const double px = (x + dx + 0.5) / width - 0.5;
+	//			const double py = ((height - y - 1) + dy + 0.5) / height - 0.5;
 
-				// 放射輝度の計算
-				const Vec dir = cx * px + cy * py + camera.dir;
-				const Ray ray(camera.org + dir * 13.0, Normalize(dir));
-				const Color L = radiance(ray, Medium(), rng, 0, maxDepth);
-				Assertion(L.isValid(), "Radiance is invalid: (%f, %f %f)", L.x, L.y, L.z);
+	//			// 放射輝度の計算
+	//			const Vec dir = cx * px + cy * py + camera.dir;
+	//			const Ray ray(camera.org + dir * 13.0, Normalize(dir));
+	//			const Color L = radiance(ray, Medium(), rng, 0, maxDepth);
+	//			Assertion(L.isValid(), "Radiance is invalid: (%f, %f %f)", L.x, L.y, L.z);
 
-				pixel = pixel + L;
-			}
-			pixel = pixel / samples;
+	//			pixel = pixel + L;
+	//		}
+	//		pixel = pixel / samples;
 
-			// 進行度の表示
-			mtx.lock();
-			progressBar(++progress, width * height);
-			mtx.unlock();
-		}
-	});
+	//		// 進行度の表示
+	//		mtx.lock();
+	//		progressBar(++progress, width * height);
+	//		mtx.unlock();
+	//	}
+	//});
 
 	// PPMファイルを保存
-	const std::string outfile = std::string(OUTPUT_DIRECTORY) + "image.ppm";
-	save_ppm_file(outfile, image.get(), width, height);
+	//const std::string outfile = std::string(OUTPUT_DIRECTORY) + "image.ppm";
+	//save_ppm_file(outfile, image.get(), width, height);
+
+	 std::vector<TRIANGLE*> polygons;
+	for (int i = 0; i < objList.size(); i++) {
+		for (int j = 0; j < triangles[i].size(); j++) {
+			polygons.push_back(&triangles[i][j]);
+		}
+	}
+
+	Vec v[8];
+
+	constructBVH(polygons);
+
+	//nodesの各々のbboxをobjファイルで吐き出す(blenderでかくにん)
+	for (int i = 0; i < (sizeof(nodes) / (sizeof(BVH_node)));i++) {
+		
+		/*v[2] = Vec(1.617, 1.2721, 7.44);
+		v[5] = Vec(6.413,6.022,11.165 );*/
+
+		v[2] = Vec(nodes[i].bbox[0][0], nodes[i].bbox[0][1], nodes[i].bbox[0][2]);
+		v[5] = Vec(nodes[i].bbox[1][0], nodes[i].bbox[1][1], nodes[i].bbox[1][2]);
+		v[0] = v[2] + Vec (0.0, 0.0, v[5].z-v[2].z);
+		v[1] = v[2] + Vec(0.0, v[5].y - v[2].y, v[5].z - v[2].z);
+		v[3] = v[2] + Vec(0.0, v[5].y - v[2].y, 0.0);
+		v[4] = v[2] + Vec(v[5].x-v[2].x, 0.0, v[5].z - v[2].z);
+		v[6] = v[2] + Vec(v[5].x - v[2].x, 0.0, 0.0);
+		v[7] = v[2] + Vec(v[5].x - v[2].x, v[5].y - v[2].y, 0.0);
+		std::string fname = "bbox";
+		std::ostringstream ss;
+		ss << i;
+		fname = fname + ss.str();
+		fname = fname + ".obj";
+		const std::string outfile = std::string(OUTPUT_DIRECTORY) + fname;
+		save_box_obj_blender_file(outfile, v);
+	
+
+	}
 }

@@ -1,4 +1,16 @@
 ﻿  main.cpp
-c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(464): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(27): warning C4305: '=': 'const double' から 'float' へ切り詰めます。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(28): warning C4305: '=': 'const double' から 'float' へ切り詰めます。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(101): warning C4244: '引数': 'const double' から 'const float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(117): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(66): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(66): warning C4267: '初期化中': 'size_t' から 'const int' に変換しました。データが失われているかもしれません。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(550): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(601): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(602): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(603): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(604): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(605): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(606): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
   Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\x64\Debug\Simple_Volpath_mesh.exe
   Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\x64\Debug\Simple_Volpath_mesh.pdb (Partial PDB)

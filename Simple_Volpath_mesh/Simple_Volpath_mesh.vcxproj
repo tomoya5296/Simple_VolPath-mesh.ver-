@@ -111,6 +111,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\src\bvh.h" />
     <ClInclude Include="..\src\common.h" />
     <ClInclude Include="..\src\dirs.h" />
     <ClInclude Include="..\src\intersect.h" />

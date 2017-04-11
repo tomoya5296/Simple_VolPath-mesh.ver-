@@ -122,9 +122,7 @@ struct TRIANGLE {
 	Vec n[3];
 	Vec normal;
 	Material mat;
-
-	
-
+	float bbox[2][3];
 };
 
 
