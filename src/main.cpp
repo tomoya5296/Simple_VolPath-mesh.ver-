@@ -135,7 +135,7 @@ TRIANGLE * Intersect(BVH_node *nodes, int index, const Ray &ray, Intersection *i
 		}
 	}
 	else {
-		// 交差していない (何もする必要なし)
+		return nullptr;// 交差していない (何もする必要なし)
 	}
 	return nullptr;
 }
@@ -152,8 +152,6 @@ inline bool intersect_scene_only_triangles(const Ray &ray, Intersection  *inters
 			if (hitpoint.distance <= intersection->hitpoint.distance) {
 				intersection->hitpoint = hitpoint;
 				intersection->Mat = polygons[i]->mat;
-				//intersection->obj_id = ;
-				//intersection->tri_num = ;
 				intersection->hitpoint.orienting_normal = Dot(intersection->hitpoint.normal, ray.dir) < 0.0 ? intersection->hitpoint.normal : (-1.0 * intersection->hitpoint.normal);
 			}
 		}
@@ -198,13 +196,18 @@ Color direct_radiance_sample(const Vec &v0, const Vec &normal, const TRIANGLE* t
 	// 光源上の一点をサンプリングする
 	//u0,u1は0～1の乱数
 	int r1 = (int)(u0*(2));//TODO メッシュの数を撃ち込まなくてもできるようにする.
-	TRIANGLE light_triangle =triangles[LightID][r1];//ランダムにlightのメッシュが取れた
-	Vec light_pos = light_triangle.v[0] + u1*(light_triangle.v[1] - light_triangle.v[0]) + u2*(1.0-u1)*(light_triangle.v[2] - light_triangle.v[1]);
+	TRIANGLE *light_triangle =&triangles[LightID][r1];//ランダムにlightのメッシュが取れた
+	Vec light_pos = light_triangle->v[0] + u1*(light_triangle->v[1] - light_triangle->v[0]) + u2*(1.0-u1)*(light_triangle->v[2] - light_triangle->v[1]);
 	Vec dir = Normalize(light_pos - v0);
 
 	TRIANGLE* HitTri = nullptr;
 	Intersection lintersect;
 	HitTri = Intersect(nodes, 0, Ray(v0, dir), &lintersect);
+
+
+
+
+
 	if (HitTri != nullptr) {
 		if (HitTri->obj_id == LightID) {
 			return direct_radiance(v0, normal, tri, light_pos, lintersect);
@@ -270,6 +273,9 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	Intersection intersection;
 	HitTri = Intersect(nodes, 0, ray, &intersection);
 
+	//return HitTri->mat.ref / intersection.hitpoint.distance;
+
+
 	if (HitTri == nullptr) {
 		return Color(0.0);
 	}
@@ -280,15 +286,15 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	const TRIANGLE &obj = *HitTri;
 	const Vec normal = obj.normal;//ok
 	const Vec orienting_normal = Dot(normal, ray.dir) < 0.0 ? normal : (-1.0 * normal); // 交差位置の法線（物体からのレイの入出を考慮）
-	const Vec hitpoint = ray.org +t*ray.dir;//ok
-	return Vec(Dot(Normalize(normal), Normalize(ray.dir)));
 
-	//return obj.mat.ref/(t);
-	//return Vec(Dot(intersection.hitpoint.tri->normal, -ray.dir));
+
+	//return Vec(Dot(normal, Normalize(-ray.dir)));
+	const Vec hitpoint = ray.org +t*ray.dir;//ok
+
+
 	// 最大のbounce数を評価
 	if (depth >= maxDepth) {
-
-		if (Dot(ray.dir,-normal)>0.0) {
+		if (Dot(ray.dir,normal)>0.0) {
 			return obj.mat.Le;
 		}
 		else {
@@ -352,10 +358,8 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 				const int shadow_ray = 1;
 				Vec direct_light;
 				for (int i = 0; i < shadow_ray; i++) {
-					direct_light = direct_light + direct_radiance_sample(hitpoint, normal, &obj, rng.next01(), rng.next01(),rng.next01()) / shadow_ray;
+					direct_light = direct_light + direct_radiance_sample(hitpoint, orienting_normal, &obj, rng.next01(), rng.next01(),rng.next01()) / shadow_ray;
 				}
-			
-
 
 				// orienting_normalの方向を基準とした正規直交基底(w, u, v)を作る。この基底に対する半球内で次のレイを飛ばす。
 				Vec w, u, v;
@@ -400,7 +404,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 			//	}
 			//}
 			 //direct_light;
-		Vec	nnormal = Vec(-normal.x, -normal.y, -normal.z);
+			Vec	nnormal = Vec(-normal.x, -normal.y, -normal.z);
 			return	Multiply(transmittance_ratio, radiance(Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir)), medium, rng, depth + 1, maxDepth)) / (1.0 - scattering_probability) / russian_roulette_probability;
 		} break;
 		case REFRACTION: {			
@@ -696,7 +700,7 @@ inline void objectload(int i , std::vector<std::string> strList) {
 			triangles[i][f].bbox[1][0] = std::max(std::max(triangles[i][f].v[0].x, triangles[i][f].v[1].x), triangles[i][f].v[2].x);
 			triangles[i][f].bbox[1][1] = std::max(std::max(triangles[i][f].v[0].y, triangles[i][f].v[1].y), triangles[i][f].v[2].y);
 			triangles[i][f].bbox[1][2] = std::max(std::max(triangles[i][f].v[0].z, triangles[i][f].v[1].z), triangles[i][f].v[2].z);
-			triangles[i][f].normal = (triangles[i][f].n[0] + triangles[i][f].n[1] + triangles[i][f].n[2]) / 3;//Normalize(Cross((triangles[i][f].v[1]- triangles[i][f].v[0]), (triangles[i][f].v[2] - triangles[i][f].v[0])));
+			triangles[i][f].normal =(triangles[i][f].n[0] + triangles[i][f].n[1] + triangles[i][f].n[2]) / 3;//*(triangles[i][f].n[0] + triangles[i][f].n[1] + triangles[i][f].n[2]) / 3;*/
 			triangles[i][f].obj_id = i;
 			index_offset += fv;
 
@@ -736,7 +740,7 @@ int main(int argc, char **argv) {
 	// コマンド引数のパース
 	int width = 640;
 	int height = 480;
-	int samples =  10;
+	int samples =  1;
 	int maxDepth = 2;
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--width") == 0) {
@@ -822,5 +826,5 @@ int main(int argc, char **argv) {
 	// PPMファイルを保存
 	const std::string outfile = std::string(OUTPUT_DIRECTORY) + "image.ppm";
 	save_ppm_file(outfile, image.get(), width, height);
-	system("pause");
+	//system("pause");
 }
