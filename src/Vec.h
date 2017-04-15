@@ -38,7 +38,7 @@ struct Vec {
 	inline Vec operator/(const Vec &b) const { return Vec(x / b.x, y / b.y, z / b.z); }
 	inline const double LengthSquared() const { return x*x + y*y + z*z; }
 	inline const double Length() const { return sqrt(LengthSquared()); }
-
+	inline bool operator==(Vec &b) { return (((x==b.x)&&(y==b.y))&&(z==b.z)); }
 
 	static Vec exp(const Vec &v) { return Vec(std::exp(v.x), std::exp(v.y), std::exp(v.z)); }
 

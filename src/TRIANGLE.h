@@ -98,9 +98,11 @@ struct TRIANGLE {
 				if (t1 < 0.0) {
 					return false;
 				}
+				hitpoint->tri = this;
 				hitpoint->distance = t1;
 				hitpoint->position = ray.org + hitpoint->distance*ray.dir;
 				hitpoint->normal =normal;
+				
 				return true;
 			}
 		}
@@ -123,6 +125,7 @@ struct TRIANGLE {
 	Vec normal;
 	Material mat;
 	float bbox[2][3];
+	int obj_id;
 };
 
 

@@ -10,8 +10,6 @@ struct BVH_node {
 	int children[2];    // 子ノード
 	std::vector<TRIANGLE *> polygons;  // 格納されているポリゴン (葉ノードのみ有効)
 };
-
-
 // AABB の表面積計算
 float surfaceArea(const float bbox[2][3]) {
 	float dx = bbox[1][0] - bbox[0][0];
@@ -19,17 +17,11 @@ float surfaceArea(const float bbox[2][3]) {
 	float dz = bbox[1][2] - bbox[0][2];
 	return 2 * ((dx*dy) + (dx*dz) + (dy*dz));
 }
-
-
-
 // 空の AABB を作成
 void  emptyAABB (float bbox[2][3]) {
 	bbox[0][0] = bbox[0][1] = bbox[0][2] = INF;
 	bbox[1][0] = bbox[1][1] = bbox[1][2] = -INF;
 }
-
-
-
 // 2つのAABBをマージ
 void mergeAABB(const float bbox1[2][3], const float bbox2[2][3], float result[2][3]) {
 	for (int j = 0; j<3; j++) {
@@ -37,31 +29,20 @@ void mergeAABB(const float bbox1[2][3], const float bbox2[2][3], float result[2]
 		result[1][j] =std::max(bbox1[1][j], bbox2[1][j]);
 	}
 }
-
-
-
-
 // ポリゴンリストからAABBを生成
-
 void creatAABBfromTriangles(const std::vector<TRIANGLE *> &triangles, float bbox[2][3]) {
 	emptyAABB(bbox);
 
 	std::for_each(triangles.begin(), triangles.end(), [&bbox](const TRIANGLE *t) {
 		mergeAABB(t->bbox, bbox, bbox);
 	});
-
-
-
-
 }
 
 
-BVH_node nodes[100];  // ノードリスト．本当は適切なノード数を確保すべき
+BVH_node nodes[10000];  // ノードリスト．本当は適切なノード数を確保すべき
 int used_node_count = 0;  // 現在使用されているノードの数
 float T_tri = 1;  // 適当				//TODOちゃんと求める
 float T_aabb = 1;  // 適当			//TODOちゃんと求める
-
-
 
 // nodeIndex で指定されたノードを、polygons を含む葉ノードにする
 void makeLeaf(std::vector<TRIANGLE *> &polygons, BVH_node *node) {
@@ -85,14 +66,16 @@ void constructBVH_internal(std::vector<TRIANGLE *> &polygons, int nodeIndex) {
 	int bestAxis = -1;  // 分割に最も良い軸 (0:x, 1:y, 2:z)
 	int bestSplitIndex = -1;  // 最も良い分割場所
 	float SA_root = surfaceArea(node->bbox); // ノード全体のAABBの表面積
-
 	for (int axis = 0; axis<3; axis++) {
 		// ポリゴンリストを、それぞれのAABBの中心座標を使い、axis でソートする
 		std::sort(polygons.begin(), polygons.end(),
 			[axis](const TRIANGLE *a, const TRIANGLE *b) {
-			return ((a->bbox[1][axis]- a->bbox[0][axis])/2 )< ((b->bbox[1][axis] - b->bbox[0][axis]) / 2);//AABB の中心座標でソートx<y<zの優先順位？
-		});
+			double A = ((a->bbox[1][axis] + a->bbox[0][axis]) / 2);
+			double B = ((b->bbox[1][axis] + b->bbox[0][axis]) / 2);
 
+			return (A<B);//AABB の中心座標でソートx<y<zの優先順位？
+		});
+	
 		std::vector<TRIANGLE *> s1, s2(polygons);  // 分割された2つの領域
 		float s1bbox[2][3]; emptyAABB(s1bbox); // S1のAABB
 
@@ -146,11 +129,13 @@ void constructBVH_internal(std::vector<TRIANGLE *> &polygons, int nodeIndex) {
 		// bestAxis でソート
 		sort(polygons.begin(), polygons.end(),
 			[bestAxis](const TRIANGLE *a, const TRIANGLE *b) {
-			return ((a->bbox[1][bestAxis]-a->bbox[0][bestAxis])/2) <((b->bbox[1][bestAxis] - b->bbox[0][bestAxis]) / 2);
+			return ((a->bbox[1][bestAxis]+a->bbox[0][bestAxis])/2) <((b->bbox[1][bestAxis]+b->bbox[0][bestAxis]) / 2);
 		});
 		// 左右の子ノードを作成
-		node->children[0] = used_node_count; used_node_count++;
-		node->children[1] = used_node_count; used_node_count++;
+		used_node_count++;
+		node->children[0] = used_node_count;
+		used_node_count++;
+		node->children[1] = used_node_count; 
 		// ポリゴンリストを分割
 		std::vector<TRIANGLE *> left(polygons.begin(), polygons.begin() + bestSplitIndex);
 		std::vector<TRIANGLE *> right(polygons.begin() + bestSplitIndex, polygons.end());
@@ -162,8 +147,15 @@ void constructBVH_internal(std::vector<TRIANGLE *> &polygons, int nodeIndex) {
 
 // フロントエンド関数．これを呼べば nodes[0] をルートとした BVH が構築される
 void constructBVH(std::vector<TRIANGLE *> &polygons) {
+	
+						//ポリゴン数が最大で2^()
 	used_node_count = 0;
 	constructBVH_internal(polygons, 0);  // nodes[0] をルートノードとみなす
 }
+
+
+
+
+
 
 #endif  // _BVH_H_

@@ -21,9 +21,6 @@
     <ClInclude Include="..\src\dirs.h">
       <Filter>ソース ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\intersect.h">
-      <Filter>ソース ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\intersection.h">
       <Filter>ソース ファイル</Filter>
     </ClInclude>
@@ -55,6 +52,9 @@
       <Filter>ソース ファイル</Filter>
     </ClInclude>
     <ClInclude Include="..\src\bvh.h">
+      <Filter>ソース ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\scene.h">
       <Filter>ソース ファイル</Filter>
     </ClInclude>
   </ItemGroup>
