@@ -165,7 +165,8 @@ inline bool intersect_scene_only_triangles(const Ray &ray, Intersection  *inters
 //光の向きが一意(SPECULAR,REFRACTION)のとき使う//注意　光源のどこかをinteersectで必ず渡すこと:取れていなければ使わない ref)SPECULAR
 
 Color direct_radiance(const Vec &v0, const Vec &normal, const TRIANGLE* tri, const Vec &light_pos,Intersection lintersect) {
-	const Vec light_normal = tri->normal;
+	//tri は光源ではなくもとのobjのメッシュ
+	const Vec light_normal = lintersect.hitpoint.tri->normal;
 	const Vec light_dir = Normalize(light_pos - v0);
 	const double dist2 = (light_pos - v0).LengthSquared();
 	const double dot0 = Dot(normal, light_dir);
@@ -176,13 +177,13 @@ Color direct_radiance(const Vec &v0, const Vec &normal, const TRIANGLE* tri, con
 
 
 		TRIANGLE* HitTri = nullptr;
-		Intersection lintersect;
-		HitTri = Intersect(nodes, 0, Ray(v0, light_dir), &lintersect);
-		if (std::abs(sqrt(dist2) - lintersect.hitpoint.distance) < 1e-3) {
-			Vec edge1 = (lintersect.hitpoint.tri->v[1]- lintersect.hitpoint.tri->v[0]);
-			Vec edge2 = (lintersect.hitpoint.tri->v[2] - lintersect.hitpoint.tri->v[0]);
+		Intersection intersect;
+		HitTri = Intersect(nodes, 0, Ray(v0, light_dir), &intersect);
+		if (std::abs(sqrt(dist2) - intersect.hitpoint.distance) < 1e-3) {
+			Vec edge1 = (intersect.hitpoint.tri->v[1]- intersect.hitpoint.tri->v[0]);
+			Vec edge2 = (intersect.hitpoint.tri->v[2] - intersect.hitpoint.tri->v[0]);
 			double S = Cross(edge1,edge2).Length()/2;//lightのメッシュ一つの表面積
-			return Multiply(tri->mat.ref, lintersect.hitpoint.tri->mat.Le) * (1.0 / PI) * G / (1.0 / (triangles[LightID].size()*S));
+			return Multiply(tri->mat.ref, intersect.hitpoint.tri->mat.Le) * (1.0 / PI) * G / (1.0 / (triangles[LightID].size()*S));
 			//(1.0 / PI)てなんでだっけ
 		}
 	}
@@ -203,9 +204,6 @@ Color direct_radiance_sample(const Vec &v0, const Vec &normal, const TRIANGLE* t
 	TRIANGLE* HitTri = nullptr;
 	Intersection lintersect;
 	HitTri = Intersect(nodes, 0, Ray(v0, dir), &lintersect);
-
-
-
 
 
 	if (HitTri != nullptr) {
@@ -288,13 +286,15 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	const Vec orienting_normal = Dot(normal, ray.dir) < 0.0 ? normal : (-1.0 * normal); // 交差位置の法線（物体からのレイの入出を考慮）
 
 
+	//return Vec(Dot(-ray.dir, orienting_normal));
+
 	//return Vec(Dot(normal, Normalize(-ray.dir)));
 	const Vec hitpoint = ray.org +t*ray.dir;//ok
 
 
 	// 最大のbounce数を評価
 	if (depth >= maxDepth) {
-		if (Dot(ray.dir,normal)>0.0) {
+		if (Dot(-ray.dir,normal)>0.0) {
 			return obj.mat.Le;
 		}
 		else {
@@ -306,7 +306,12 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	double russian_roulette_probability = std::max(obj.mat.ref.x, std::max(obj.mat.ref.y, obj.mat.ref.z));
 	russian_roulette_probability = std::max(0.05, russian_roulette_probability);
 	if (rng.next01() > russian_roulette_probability) {
-		return obj.mat.Le / (1.0 - russian_roulette_probability);
+		if (Dot(-ray.dir, normal) > 0.0) {
+			return obj.mat.Le / (1.0 - russian_roulette_probability);
+		}
+		else {
+			return Color(0.0);
+		}
 	}
 
 	// レイと物体の交差点からの放射輝度を計算するか、途中の点における周囲からの影響を計算するかを選択するロシアンルーレット
@@ -360,7 +365,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 				for (int i = 0; i < shadow_ray; i++) {
 					direct_light = direct_light + direct_radiance_sample(hitpoint, orienting_normal, &obj, rng.next01(), rng.next01(),rng.next01()) / shadow_ray;
 				}
-
+				
 				// orienting_normalの方向を基準とした正規直交基底(w, u, v)を作る。この基底に対する半球内で次のレイを飛ばす。
 				Vec w, u, v;
 				w = orienting_normal;
@@ -375,12 +380,16 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 				const double r2 = rng.next01();
 				const double r2s = sqrt(r2);
 				Vec dir = Normalize((u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1.0 - r2)));
-
 				// 減衰を考慮しつつ次を計算
 				return direct_light + Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(Ray(hitpoint, dir), medium, rng, depth + 1, maxDepth))) / (1.0 - scattering_probability) / russian_roulette_probability;
 			}
 			else if (depth == 0) {
-				return obj.mat.Le;
+				if (Dot(-ray.dir,obj.normal)<0.0) {
+					return obj.mat.Le;
+				}
+				else {
+					return Color(0.0);
+				}
 			}
 			else {
 				return Color(0.0);
@@ -388,24 +397,23 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 		} break;
 
 		case SPECULAR: {
-			
 			// 完全鏡面なのでレイの反射方向は決定的。
 			// ロシアンルーレットの確率で除算するのは上と同じ。
 			//Intersection lintersect;//反射光の情報
-			//Ray reflection_ray = Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir));
+			Ray reflection_ray = Ray(hitpoint, -(ray.dir - normal * 2.0 * Dot(normal, ray.dir)));
+			//Ray reflection_ray = Ray(hitpoint, Normalize((triangles[0][0].v[0]+triangles[0][1].v[2])/2-hitpoint));//TODO 方向がなんかおかしいたぶんしたとか向いてそう
+
 			//TRIANGLE* HitTri = nullptr;
 			//HitTri = Intersect(nodes, 0, reflection_ray, &lintersect);
-			//intersect(reflection_ray, &lintersect);
 			//Vec direct_light;
 			//if (HitTri != nullptr) {
 			//	if (lintersect.obj_id == LightID) {
 			//		//direct_light = direct_radiance(hitpoint, orienting_normal, reflection_ray.org + lintersect.hitpoint.distance*reflection_ray.dir);
-			//		direct_light = direct_radiance(hitpoint, orienting_normal, HitTri, reflection_ray.org + lintersect.hitpoint.distance * reflection_ray.dir, lintersect);
+			//		direct_light = direct_radiance(hitpoint, normal, &obj, reflection_ray.org + lintersect.hitpoint.distance * reflection_ray.dir,lintersect);
 			//	}
 			//}
-			 //direct_light;
-			Vec	nnormal = Vec(-normal.x, -normal.y, -normal.z);
-			return	Multiply(transmittance_ratio, radiance(Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir)), medium, rng, depth + 1, maxDepth)) / (1.0 - scattering_probability) / russian_roulette_probability;
+			//return  direct_light;
+			return	Multiply(transmittance_ratio, radiance(reflection_ray/*Ray(hitpoint, reflection_ray/*ray.dir - normal * 2.0 * Dot(normal, ray.dir))*/, medium, rng, depth + 1, maxDepth)) / (1.0 - scattering_probability) / russian_roulette_probability;
 		} break;
 		case REFRACTION: {			
 			Ray reflection_ray = Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir));
@@ -740,8 +748,8 @@ int main(int argc, char **argv) {
 	// コマンド引数のパース
 	int width = 640;
 	int height = 480;
-	int samples =  1;
-	int maxDepth = 2;
+	int samples = 1;
+	int maxDepth = 50;
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--width") == 0) {
 			width = std::atoi(argv[++i]);
@@ -770,7 +778,7 @@ int main(int argc, char **argv) {
 
 	// カメラ
 	const Vec camPos = 0.1 * Vec(49.0, 60.0, 295.6);
-	const Vec camDir = Normalize(Vec(-0.045, -0.042612, -1.0));
+	const Vec camDir = Normalize(Vec(-0.045,-0.042612, -1.0));
 	const Ray camera(camPos, camDir);
 
 	// スクリーンの基底ベクトル
