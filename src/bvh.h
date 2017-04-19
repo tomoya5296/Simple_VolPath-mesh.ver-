@@ -41,8 +41,8 @@ void creatAABBfromTriangles(const std::vector<TRIANGLE *> &triangles, float bbox
 
 BVH_node nodes[10000];  // ノードリスト．本当は適切なノード数を確保すべき
 int used_node_count = 0;  // 現在使用されているノードの数
-float T_tri = 1;  // 適当				//TODOちゃんと求める
-float T_aabb = 1;  // 適当			//TODOちゃんと求める
+float T_tri = 1.0;  // 適当				
+float T_aabb = 1.0;  // 適当			
 
 // nodeIndex で指定されたノードを、polygons を含む葉ノードにする
 void makeLeaf(std::vector<TRIANGLE *> &polygons, BVH_node *node) {
@@ -152,10 +152,4 @@ void constructBVH(std::vector<TRIANGLE *> &polygons) {
 	used_node_count = 0;
 	constructBVH_internal(polygons, 0);  // nodes[0] をルートノードとみなす
 }
-
-
-
-
-
-
 #endif  // _BVH_H_

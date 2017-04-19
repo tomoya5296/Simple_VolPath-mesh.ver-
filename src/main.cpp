@@ -16,6 +16,7 @@
 #include<algorithm>
 #include <iomanip>
 #include<time.h>
+#include <fenv.h>
 #include "common.h"
 #include "dirs.h"
 #include "parallel.h"
@@ -37,9 +38,9 @@
 const int LightID = 0;
 std::vector<std::string> objList =
 {
-	"light_plane.obj","left_plane.obj","right_plane.obj","up_plane.obj","bottom_plane.obj","far_plane.obj","box.obj"
+	"light_plane.obj","left_plane.obj","right_plane.obj","up_plane.obj","bottom_plane.obj","far_plane.obj","bunny.obj"
 };
-std::vector<std::vector <TRIANGLE>>triangles;
+std::vector<std::vector <TRIANGLE>>triangles;//三角形たちを二次元配列で持つ
 
 
 int Intersect(const std::vector<TRIANGLE *> &polygons, const Ray ray, Intersection  *intersection) {
@@ -80,9 +81,12 @@ bool IntersectAABB(float aabb[2][3], const Ray &ray) {
 	double t_max = INF;
 	double t_min = -INF;
 
+	for (int i = 0; i < 3; i++) 
+	{
+		
+		double t1 = (aabb[0][i] - ray_org[i]) /( ray_dir[i]+EPS);
+feclearexcept(FE_ALL_EXCEPT);
 
-	for (int i = 0; i < 3; i++) {
-		double t1 = (aabb[0][i] - ray_org[i]) /( ray_dir[i]+EPS);//TODO 0割が起きてるから少し変えたけどどうなのか？
 		double t2 = (aabb[1][i] - ray_org[i]) /( ray_dir[i]+EPS);
 		double t_far = std::max(t1, t2);
 		double t_near = std::min(t1, t2);
@@ -142,26 +146,6 @@ TRIANGLE * Intersect(BVH_node *nodes, int index, const Ray &ray, Intersection *i
 
 
 
-//与えられた三角形たちについて交差判定を行う
-inline bool intersect_scene_only_triangles(const Ray &ray, Intersection  *intersection,std::vector<TRIANGLE *>polygons) {
-	intersection->hitpoint.distance = INF;
-
-	for (int i = 0; i < polygons.size(); i++) {
-		Hitpoint hitpoint;
-		if (polygons[i]->intersect(ray, &hitpoint)) {
-			if (hitpoint.distance <= intersection->hitpoint.distance) {
-				intersection->hitpoint = hitpoint;
-				intersection->Mat = polygons[i]->mat;
-				intersection->hitpoint.orienting_normal = Dot(intersection->hitpoint.normal, ray.dir) < 0.0 ? intersection->hitpoint.normal : (-1.0 * intersection->hitpoint.normal);
-			}
-		}
-	
-	}
-}
-
-
-
-
 //光の向きが一意(SPECULAR,REFRACTION)のとき使う//注意　光源のどこかをinteersectで必ず渡すこと:取れていなければ使わない ref)SPECULAR
 
 Color direct_radiance(const Vec &v0, const Vec &normal, const TRIANGLE* tri, const Vec &light_pos,Intersection lintersect) {
@@ -174,8 +158,6 @@ Color direct_radiance(const Vec &v0, const Vec &normal, const TRIANGLE* tri, con
 
 	if (dot0 >= 0.0 && dot1 >= 0.0) {
 		const double G = dot0 * dot1 / dist2;
-
-
 		TRIANGLE* HitTri = nullptr;
 		Intersection intersect;
 		HitTri = Intersect(nodes, 0, Ray(v0, light_dir), &intersect);
@@ -245,17 +227,12 @@ Color direct_radiance_sample_media(const Vec &v0, const Medium &mat, double u0, 
 	TRIANGLE light_triangle =triangles[LightID][r1];//ランダムにlightのメッシュが取れた
 	Vec light_pos = light_triangle.v[0] + u1*(light_triangle.v[1] - light_triangle.v[0]) + u2*(1.0-u1)*(light_triangle.v[2] - light_triangle.v[1]);
 	Vec dir = Normalize(light_pos - v0);
-
-
 	TRIANGLE* HitTri = nullptr;
 	Intersection lintersect;
 	HitTri = Intersect(nodes, 0, Ray(v0,dir), &lintersect);
 	// 媒質の外に出るまでの光の減衰を計算
-	
-
 	const Color sigT = mat.sigS + mat.sigA;
 	const Vec transmittance_ratio = Vec::exp(-sigT * lintersect.hitpoint.distance);
-
 	// 外に出る点への直接光の影響を計算する
 	const Vec v1 = v0 + lintersect.hitpoint.distance * dir;
 	const Color direct_light = direct_radiance_media(v1, light_pos,light_triangle);
@@ -270,28 +247,14 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	TRIANGLE* HitTri = nullptr;
 	Intersection intersection;
 	HitTri = Intersect(nodes, 0, ray, &intersection);
-
-	//return HitTri->mat.ref / intersection.hitpoint.distance;
-
-
 	if (HitTri == nullptr) {
 		return Color(0.0);
 	}
-
 	const double t = intersection.hitpoint.distance;
-
-	//const int tri_num = intersection.tri_num;
 	const TRIANGLE &obj = *HitTri;
 	const Vec normal = obj.normal;//ok
 	const Vec orienting_normal = Dot(normal, ray.dir) < 0.0 ? normal : (-1.0 * normal); // 交差位置の法線（物体からのレイの入出を考慮）
-
-
-	//return Vec(Dot(-ray.dir, orienting_normal));
-
-	//return Vec(Dot(normal, Normalize(-ray.dir)));
 	const Vec hitpoint = ray.org +t*ray.dir;//ok
-
-
 	// 最大のbounce数を評価
 	if (depth >= maxDepth) {
 		if (Dot(-ray.dir,normal)>0.0) {
@@ -302,18 +265,23 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 		}
 	}
 
+	
 	// 一定以上レイを追跡したらロシアンルーレットを実行し追跡を打ち切るかどうかを判断する
 	double russian_roulette_probability = std::max(obj.mat.ref.x, std::max(obj.mat.ref.y, obj.mat.ref.z));
 	russian_roulette_probability = std::max(0.05, russian_roulette_probability);
-	if (rng.next01() > russian_roulette_probability) {
-		if (Dot(-ray.dir, normal) > 0.0) {
-			return obj.mat.Le / (1.0 - russian_roulette_probability);
-		}
-		else {
-			return Color(0.0);
+	if (depth > 5) {
+		if (rng.next01() > russian_roulette_probability) {
+			if (Dot(-ray.dir, normal) > 0.0) {
+				return obj.mat.Le / (1.0 - russian_roulette_probability);
+			}
+			else {
+				return Color(0.0);
+			}
 		}
 	}
-
+	else {
+		russian_roulette_probability = 1.0;
+	}
 	// レイと物体の交差点からの放射輝度を計算するか、途中の点における周囲からの影響を計算するかを選択するロシアンルーレット
 	const Color sigT = medium.sigS + medium.sigA;
 	const double tr_average = (sigT.x + sigT.y + sigT.z) / 3.0;
@@ -400,27 +368,16 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 			// 完全鏡面なのでレイの反射方向は決定的。
 			// ロシアンルーレットの確率で除算するのは上と同じ。
 			//Intersection lintersect;//反射光の情報
-			Ray reflection_ray = Ray(hitpoint, -(ray.dir - normal * 2.0 * Dot(normal, ray.dir)));
-			//Ray reflection_ray = Ray(hitpoint, Normalize((triangles[0][0].v[0]+triangles[0][1].v[2])/2-hitpoint));//TODO 方向がなんかおかしいたぶんしたとか向いてそう
-
-			//TRIANGLE* HitTri = nullptr;
-			//HitTri = Intersect(nodes, 0, reflection_ray, &lintersect);
-			//Vec direct_light;
-			//if (HitTri != nullptr) {
-			//	if (lintersect.obj_id == LightID) {
-			//		//direct_light = direct_radiance(hitpoint, orienting_normal, reflection_ray.org + lintersect.hitpoint.distance*reflection_ray.dir);
-			//		direct_light = direct_radiance(hitpoint, normal, &obj, reflection_ray.org + lintersect.hitpoint.distance * reflection_ray.dir,lintersect);
-			//	}
-			//}
-			//return  direct_light;
-			return	Multiply(transmittance_ratio, radiance(reflection_ray/*Ray(hitpoint, reflection_ray/*ray.dir - normal * 2.0 * Dot(normal, ray.dir))*/, medium, rng, depth + 1, maxDepth)) / (1.0 - scattering_probability) / russian_roulette_probability;
+			Ray reflection_ray = Ray(hitpoint+Vec(EPS), Normalize(ray.dir + normal * 2.0 * Dot(-normal, ray.dir)));
+			return	Multiply(transmittance_ratio, radiance(reflection_ray, medium, rng, depth + 1, maxDepth)) / (1.0 - scattering_probability) / russian_roulette_probability;
 		} break;
 		case REFRACTION: {			
 			Ray reflection_ray = Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir));
 			// 反射方向からの直接光サンプリングする
 			Intersection llintersect;
 			TRIANGLE* HitTri = nullptr;
-			HitTri = Intersect(nodes, 0, reflection_ray, &llintersect);
+			HitTri = Intersect(nodes, 0, reflection_ray,
+				&llintersect);
 			//intersect_scene_triangle(reflection_ray, &lintersect);
 			Vec direct_light;
 			if (llintersect.obj_id == LightID) {
@@ -434,13 +391,11 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 			const double nnt = into ? nc / nt : nt / nc;
 			const double ddn = Dot(ray.dir, orienting_normal);
 			const double cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
-
 			if (cos2t < 0.0) { // 全反射した
 				return direct_light + Multiply(transmittance_ratio, Multiply(obj.mat.ref, (radiance(reflection_ray, medium, rng, depth + 1, maxDepth)))) / (1.0 - scattering_probability) / russian_roulette_probability;
 			}
 			// 屈折していく方向
 			Vec tdir = Normalize(ray.dir * nnt - normal * (into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t)));
-
 			// SchlickによるFresnelの反射係数の近似
 			const double a = nt - nc, b = nt + nc;
 			const double R0 = (a * a) / (b * b);
@@ -677,8 +632,6 @@ inline void objectload(int i , std::vector<std::string> strList) {
 
 				triangles[i][f].v[ve] = vertex;
 				triangles[i][f].n[ve] = normal;
-				
-			
 							if (i == 0) {
 								triangles[i][f].mat = lightMat;//TODO 各オブジェクトについて変更できるようにする
 							}
@@ -698,7 +651,7 @@ inline void objectload(int i , std::vector<std::string> strList) {
 								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 							else if (i == 6) {
-								triangles[i][f].mat = mirrorMat;//TODO 各オブジェクトについて変更できるようにする
+								triangles[i][f].mat =blueMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 			}
 
@@ -708,7 +661,7 @@ inline void objectload(int i , std::vector<std::string> strList) {
 			triangles[i][f].bbox[1][0] = std::max(std::max(triangles[i][f].v[0].x, triangles[i][f].v[1].x), triangles[i][f].v[2].x);
 			triangles[i][f].bbox[1][1] = std::max(std::max(triangles[i][f].v[0].y, triangles[i][f].v[1].y), triangles[i][f].v[2].y);
 			triangles[i][f].bbox[1][2] = std::max(std::max(triangles[i][f].v[0].z, triangles[i][f].v[1].z), triangles[i][f].v[2].z);
-			triangles[i][f].normal =(triangles[i][f].n[0] + triangles[i][f].n[1] + triangles[i][f].n[2]) / 3;//*(triangles[i][f].n[0] + triangles[i][f].n[1] + triangles[i][f].n[2]) / 3;*/
+			triangles[i][f].normal =(triangles[i][f].n[0] + triangles[i][f].n[1] + triangles[i][f].n[2]) / 3; /*Normalize(Cross((triangles[i][f].v[1]- triangles[i][f].v[0]), (triangles[i][f].v[2] - triangles[i][f].v[0])));*/ 
 			triangles[i][f].obj_id = i;
 			index_offset += fv;
 
@@ -733,9 +686,7 @@ int main(int argc, char **argv) {
 		objectload(i, objList);
 
 	}
-
-
-	std::vector<TRIANGLE*> polygons;
+	std::vector<TRIANGLE*> polygons;//BVHの関係で一次元配列で持たないといけない
 	for (int i = 0; i < triangles.size(); i++) {
 		for (int j = 0; j < triangles[i].size(); j++) {
 			polygons.push_back(&triangles[i][j]);
@@ -743,12 +694,12 @@ int main(int argc, char **argv) {
 	}
 
 	constructBVH(polygons);
-
+	
 
 	// コマンド引数のパース
 	int width = 640;
 	int height = 480;
-	int samples = 1;
+	int samples = 10;
 	int maxDepth = 50;
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--width") == 0) {
@@ -834,5 +785,4 @@ int main(int argc, char **argv) {
 	// PPMファイルを保存
 	const std::string outfile = std::string(OUTPUT_DIRECTORY) + "image.ppm";
 	save_ppm_file(outfile, image.get(), width, height);
-	//system("pause");
 }
