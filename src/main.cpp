@@ -352,7 +352,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 				return direct_light + Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(Ray(hitpoint, dir), medium, rng, depth + 1, maxDepth))) / (1.0 - scattering_probability) / russian_roulette_probability;
 			}
 			else if (depth == 0) {
-				if (Dot(-ray.dir,obj.normal)<0.0) {
+				if (Dot(-ray.dir,obj.normal)>0.0) {
 					return obj.mat.Le;
 				}
 				else {
