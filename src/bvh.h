@@ -58,8 +58,8 @@ void constructBVH_internal(std::vector<TRIANGLE *> &polygons, int nodeIndex) {
 	BVH_node *node = &nodes[nodeIndex];
 	
 	creatAABBfromTriangles(polygons, node->bbox);  // 全体を囲うAABBを計算
-				
-												   
+
+ 
 												   // 領域分割をせず、polygons を含む葉ノードを構築する場合を暫定の bestCost にする
 	float bestCost = T_tri * polygons.size();
 
@@ -127,7 +127,7 @@ void constructBVH_internal(std::vector<TRIANGLE *> &polygons, int nodeIndex) {
 	else {
 		// bestAxis に基づき、左右に分割
 		// bestAxis でソート
-		sort(polygons.begin(), polygons.end(),
+		std::sort(polygons.begin(), polygons.end(),
 			[bestAxis](const TRIANGLE *a, const TRIANGLE *b) {
 			return ((a->bbox[1][bestAxis]+a->bbox[0][bestAxis])/2) <((b->bbox[1][bestAxis]+b->bbox[0][bestAxis]) / 2);
 		});

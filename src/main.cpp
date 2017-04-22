@@ -651,7 +651,7 @@ inline void objectload(int i , std::vector<std::string> strList) {
 								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 							else if (i == 6) {
-								triangles[i][f].mat =blueMat;//TODO 各オブジェクトについて変更できるようにする
+								triangles[i][f].mat =diamondMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 			}
 
@@ -699,7 +699,7 @@ int main(int argc, char **argv) {
 	// コマンド引数のパース
 	int width = 640;
 	int height = 480;
-	int samples = 10;
+	int samples = 100;
 	int maxDepth = 50;
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--width") == 0) {
