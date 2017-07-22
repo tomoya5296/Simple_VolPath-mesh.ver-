@@ -70,19 +70,6 @@ struct TRIANGLE {
 			return false;
 		}
 		denominator = det(edge1, edge2, invRay);
-
-
-		//The denominator of Cramer's rule
-
-		//p is point in this triangle;
-		// p = v0 + u*edge1 + v*edge2;
-		// p = ray.org + t*ray.dir;
-		//Formula deformation;
-		//(edge1*u)+(edge2*v)-(ray.dir*t)=ray.org-v0;
-		//-(ray.dir*t)+(edge1*u)+(edge2*v)=ray.org-v0;
-		//solution is Cramer's rule
-
-		//Is a ray parallel for the triangle
 	
 		if (denominator <= 0.0) {
 			return false;

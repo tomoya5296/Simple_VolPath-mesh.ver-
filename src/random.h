@@ -2,6 +2,8 @@
 #ifndef _RANDOM_H_
 #define _RANDOM_H_
 
+#include "common.h"
+
 #include <climits>
 
 // Xor-Shiftによる乱数ジェネレータ
@@ -18,6 +20,11 @@ public:
 
 	double next01(void) {
 		return (double)next() / UINT_MAX;
+	}
+
+	double uniform(double low, double high) {
+		Assertion(low <= high, "Range of unoform random is invalid!!");
+		return next01() * (high - low) + low;
 	}
 
 	XorShift(const unsigned int initial_seed) {

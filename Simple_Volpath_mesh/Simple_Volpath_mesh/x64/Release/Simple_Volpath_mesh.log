@@ -1,0 +1,26 @@
+﻿  main.cpp
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(22): warning C4305: '=': 'const double' から 'float' へ切り詰めます。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(23): warning C4305: '=': 'const double' から 'float' へ切り詰めます。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(84): warning C4244: '引数': 'const double' から 'const float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(100): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(14): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(15): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(16): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(17): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(18): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(19): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+..\..\src\main.cpp(247): warning C4244: 'return': 'double' から 'float' への変換です。データが失われる可能性があります。
+..\..\src\main.cpp(270): warning C4244: 'return': 'double' から 'float' への変換です。データが失われる可能性があります。
+..\..\src\main.cpp(715): warning C4267: '初期化中': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
+..\..\src\main.cpp(767): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+..\..\src\main.cpp(768): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+..\..\src\main.cpp(769): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+..\..\src\main.cpp(770): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+..\..\src\main.cpp(771): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+..\..\src\main.cpp(772): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+  コード生成しています。
+  4 of 2540 functions ( 0.2%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    23 functions had inline decision re-evaluated but remain unchanged
+  コード生成が終了しました。
+  Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\Simple_Volpath_mesh\x64\Release\Simple_Volpath_mesh.exe

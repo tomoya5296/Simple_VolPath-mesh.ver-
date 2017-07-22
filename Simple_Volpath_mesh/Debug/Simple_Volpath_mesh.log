@@ -1,7 +1,0 @@
-﻿  main.cpp
-c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(65): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
-c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(460): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
-c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(463): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
-c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(513): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
-  Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\Debug\Simple_Volpath_mesh.exe
-  Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\Debug\Simple_Volpath_mesh.pdb (Partial PDB)

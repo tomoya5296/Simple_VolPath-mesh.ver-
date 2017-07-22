@@ -1,3 +1,5 @@
+
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <cmath>
 #include <cstdlib>
@@ -28,7 +30,8 @@
 #include"scene.h"
 #include"tiny_obj_loader.h"
 #include "bvh.h"
-
+#include"bssrdf.h"
+#include "move.h"
 
 
 
@@ -38,7 +41,7 @@
 const int LightID = 0;
 std::vector<std::string> objList =
 {
-	"light_plane.obj","left_plane.obj","right_plane.obj","up_plane.obj","bottom_plane.obj","far_plane.obj","bunny_front.obj"
+	"light_plane.obj","left_plane.obj","right_plane.obj","up_plane.obj","bottom_plane.obj","far_plane.obj","box_save.obj","box_left.obj"
 };
 std::vector<std::vector <TRIANGLE>>triangles;//三角形たちを二次元配列で持つ
 
@@ -236,6 +239,37 @@ Color direct_radiance_sample_media(const Vec &v0, const Medium &mat, double u0, 
 }
 
 
+float FresnelMoment1(float eta) {
+	float eta2 = eta * eta, eta3 = eta2 * eta, eta4 = eta3 * eta,
+		eta5 = eta4 * eta;
+	if (eta < 1)
+		return 0.45966f - 1.73965f * eta + 3.37668f * eta2 - 3.904945 * eta3 +
+		2.49277f * eta4 - 0.68441f * eta5;
+	else
+		return -4.61686f + 11.1136f * eta - 10.4646f * eta2 + 5.11455f * eta3 -
+		1.27198f * eta4 + 0.12746f * eta5;
+}
+
+float FresnelMoment2(float eta) {
+	float eta2 = eta * eta, eta3 = eta2 * eta, eta4 = eta3 * eta,
+		eta5 = eta4 * eta;
+	if (eta < 1) {
+		return 0.27614f - 0.87350f * eta + 1.12077f * eta2 - 0.65095f * eta3 +
+			0.07883f * eta4 + 0.04860f * eta5;
+	}
+	else {
+		float r_eta = 1 / eta, r_eta2 = r_eta * r_eta, r_eta3 = r_eta2 * r_eta;
+		return -547.033f + 45.3087f * r_eta3 - 218.725f * r_eta2 +
+			458.843f * r_eta + 404.557f * eta - 189.519f * eta2 +
+			54.9327f * eta3 - 9.00603f * eta4 + 0.63942f * eta5;
+	}
+}
+
+
+float Fdr(float eta) {
+	return -1.4399 / (eta*eta) + 0.7099 / eta + 0.6681 + 0.0636*eta;
+}
+
 
 // ray方向からの放射輝度を求める
 // ボリュームレンダリング方程式に基づく
@@ -250,24 +284,18 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	const TRIANGLE &obj = *HitTri;
 	const Vec normal = obj.normal;//ok
 	const Vec orienting_normal = Dot(normal, ray.dir) < 0.0 ? normal : (-1.0 * normal); // 交差位置の法線（物体からのレイの入出を考慮）
-	const Vec hitpoint = ray.org +(t-EPS)*ray.dir;//ok
+	const Vec hitpoint = ray.org +(t-EPS)*ray.dir;
 	/* 最大のbounce数を評価*/
-	//if (depth >= maxDepth) {
-	//	if (Dot(-ray.dir,normal)>0.0) {
-	//		return obj.mat.Le;
-	//	}
-	//	else {
-	//		return Color(0.0);
-	//	}
-	//}
 	if (depth >= maxDepth) {
 		return Color(0.0, 0.0, 0.0);
 	}
 	
+
+
 	// 最低バウンスを評価一定以上レイを追跡したらロシアンルーレットを実行し追跡を打ち切るかどうかを判断する
 	double russian_roulette_probability = std::max(obj.mat.ref.x, std::max(obj.mat.ref.y, obj.mat.ref.z));
 	russian_roulette_probability = std::max(0.05, russian_roulette_probability);
-	if (depth > 30) {
+	if (depth > 50) {
 		if (rng.next01() > russian_roulette_probability) {
 			if (Dot(-ray.dir, normal) > 0.0) {
 				return obj.mat.Le / (1.0 - russian_roulette_probability);
@@ -280,7 +308,6 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	else {
 		russian_roulette_probability = 1.0;
 	}
-	// レイと物体の交差点からの放射輝度を計算するか、途中の点における周囲からの影響を計算するかを選択するロシアンルーレット
 	const Color sigT = medium.sigS + medium.sigA;
 	const double tr_average = (sigT.x + sigT.y + sigT.z) / 3.0;
 	const double sc_average = (medium.sigS.x + medium.sigS.y + medium.sigS.z) / 3.0;
@@ -288,35 +315,118 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	if (sigT.isZero()) {
 		scattering_probability = 0.0;
 	}
-
-	if (rng.next01() < scattering_probability) {
+	 double tr_select =0.0;
+	if (0.0 < scattering_probability) {
 		//平均自由工程
-		const double u = rng.next01();
-		const double d = -log(1.0 + u * (exp(-tr_average * t) - 1.0)) / tr_average;
-		const double pdf = exp(-tr_average * d) * (-tr_average / (exp(-tr_average * t) - 1.0));
 
-		//次レイの方向を球面上から一様サンプリング
-		double r1 = 2.0 * PI * rng.next01();
-		double r2 = 1.0 - 2.0 * rng.next01();
-		const Vec next_dir(sqrt(1.0 - r2*r2) * cos(r1), sqrt(1.0 - r2*r2) * sin(r1), r2);
-		const Ray next_ray(ray.org + d * ray.dir, next_dir);
+		 double tr_use = tr_average;
+		double w = rng.next01();
+		 double d = -log(1.0 - w) / tr_use;
 
-		const Vec transmittance_ratio = Vec::exp(-sigT * d);
-		//const Vec direct_light = direct_radiance_sample_media(next_ray.org, medium, rng.next01(), rng.next01(),rng.next01());
-		//物体内なので直接光はない
-		// 位相関数
-		const double cosTheta = Dot(-Normalize(ray.dir), Normalize(next_dir));
-		const double g = 0.0;
-		const double denom = std::sqrt(std::max(0.0, 1.0 + g * g - 2.0 * g * cosTheta));
-		const double phase = (1.0 - g * g) / (4.0 * PI * denom * denom * denom);
+		if (d >= t) {
+		d = t;
+		const double pdf_surf = exp(-tr_use*t);
 
-		if (pdf == 0.0) {
-			return Color(0.0);
+		const Vec transmittance_ratio = Vec::exp(-sigT * t);
+		Ray reflection_ray = Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir));
+		// 反射方向からの直接光サンプリングする
+		Intersection llintersect;
+		TRIANGLE* lHitTri = nullptr;
+		lHitTri = Intersect(nodes, 0, reflection_ray, &llintersect);
+		Vec direct_light;
+		if (llintersect.obj_id == LightID) {
+			direct_light = Multiply(HitTri->mat.ref, triangles[LightID][0].mat.Le);
+		}
+		bool into = Dot(normal, orienting_normal) > 0.0; // レイがオブジェクトから出るのか、入るのか、出るならばfalse
+														 // Snellの法則
+		const double nc = 1.0; // 真空の屈折率
+		const double nt = 1.3; // オブジェクトの屈折率
+		const double nnt = into ? nc / nt : nt / nc;
+		const double ddn = Dot(ray.dir, orienting_normal);
+		const double cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn);
+		if (cos2t < 0.0) { // 全反射した
+			return direct_light + Multiply(transmittance_ratio, Multiply(obj.mat.ref, (radiance(reflection_ray, medium, rng, depth + 1, maxDepth)))) /  russian_roulette_probability;
+		}
+		// 屈折していく方向
+		Vec tdir = Normalize(ray.dir * nnt - normal * (into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t)));
+		// SchlickによるFresnelの反射係数の近似
+		const double a = nt - nc, b = nt + nc;
+		const double R0 = (a * a) / (b * b);
+		const double c = 1.0 - (into ? -ddn : Dot(tdir, normal));
+		const double Re = R0 + (1.0 - R0) * pow(c, 5.0);
+		const double Tr = 1.0 - Re; // 屈折光の運ぶ光の量
+		const double probability = 0.25 + 0.5 * Re;
+
+		// 屈折方向からの直接光サンプリングする
+		Ray refraction_ray = Ray(hitpoint + 2 * EPS*ray.dir, tdir);
+		Intersection lintersect;
+		lHitTri = nullptr;
+		lHitTri = Intersect(nodes, 0, refraction_ray, &lintersect);
+		Vec direct_light_refraction;
+		if (lintersect.obj_id == LightID) {
+			direct_light_refraction = Multiply(HitTri->mat.ref, triangles[LightID][0].mat.Le);
+		}
+		// 一定以上レイを追跡したら屈折と反射のどちらか一方を追跡する。（さもないと指数的にレイが増える）
+		// ロシアンルーレットで決定する。
+		if (depth > 100) {
+			if (rng.next01() < probability) { // 反射
+				return direct_light +
+					Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(reflection_ray, medium, rng, depth + 1, maxDepth) * Re))
+					/ probability
+					/ russian_roulette_probability
+				/ pdf_surf;
+			}
+			else { // 屈折
+				   // もし半透明物体ならmediumが変化
+				Medium next_medium = medium;
+				if (obj.mat.type == TRANSLUCENT && into) {
+					next_medium = obj.mat.medium;
+				}
+				else if (obj.mat.type == TRANSLUCENT && !into) {
+					next_medium = Medium();
+				}
+				return direct_light_refraction +
+					Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(refraction_ray, medium, rng, depth + 1, maxDepth) * Tr))
+					/ (1.0 - probability)
+					/ russian_roulette_probability
+					/pdf_surf;
+			}
 		}
 		else {
-			const double beta = (4.0 * PI * phase) / (pdf * scattering_probability * russian_roulette_probability);
-			const Color phi = Multiply(transmittance_ratio, Multiply(medium.sigS, radiance(next_ray, medium, rng, depth + 1, maxDepth)));
-			return beta * phi;
+			Medium next_medium = medium;
+			if (obj.mat.type == TRANSLUCENT && into) {
+				next_medium = obj.mat.medium;
+			}
+			else if (obj.mat.type == TRANSLUCENT && !into) {
+				next_medium = Medium();
+			}
+			return direct_light + direct_light_refraction +
+				Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(reflection_ray, medium, rng, depth + 1, maxDepth) * Re
+					+ radiance(refraction_ray, next_medium, rng, depth + 1, maxDepth) * Tr)) / russian_roulette_probability/pdf_surf;
+		}
+		}
+		else {	 
+			double pdf = tr_use*exp(-tr_use*d);
+			//次レイの方向を球面上から一様サンプリング
+			double r1 = 2.0 * PI * rng.next01();
+			double r2 = 1.0 - 2.0 * rng.next01();
+			const Vec next_dir(sqrt(1.0 - r2*r2) * cos(r1), sqrt(1.0 - r2*r2) * sin(r1), r2);
+			const Ray next_ray(ray.org + d * ray.dir, next_dir);
+			const Vec transmittance_ratio = Vec::exp(-sigT * d);
+			//物体内なので直接光はない
+
+			// 位相関数
+			const double cosTheta = Dot(-Normalize(ray.dir), Normalize(next_dir));
+			const double g = 0.0;
+			const double denom = std::sqrt(std::max(0.0, 1.0 + g * g - 2.0 * g * cosTheta));
+			const double phase = (1.0 - g * g) / (4.0 * PI * denom * denom * denom);
+			if (pdf == 0.0) {
+				return Color(0.0);
+			}
+			else {
+				const double beta = (4.0 * PI * phase) / (pdf * russian_roulette_probability);
+				return beta *Multiply(transmittance_ratio, Multiply(medium.sigS, radiance(next_ray, medium, rng, depth + 1, maxDepth)));
+			}
 		}
 	}
 	else {
@@ -346,13 +456,6 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 				const double r2 = rng.next01();
 				const double r2s = sqrt(r2);
 				Vec dir = Normalize((u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1.0 - r2)));
-				// 減衰を考慮しつつ次を計算
-				// レンダリング方程式に対するモンテカルロ積分を考えると、outgoing_radiance = weight * incoming_radiance。
-				// ここで、weight = (ρ/π) * cosθ / pdf(ω) / R になる。
-				// ρ/πは完全拡散面のBRDFでρは反射率、cosθはレンダリング方程式におけるコサイン項、pdf(ω)はサンプリング方向についての確率密度関数。
-				// Rはロシアンルーレットの確率。
-				// 今、コサイン項に比例した確率密度関数によるサンプリングを行っているため、pdf(ω) = cosθ/π
-				// よって、weight = ρ/ R。
 				return direct_light+Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(Ray(hitpoint, dir), medium, rng, depth + 1, maxDepth))) / (1.0 - scattering_probability) / russian_roulette_probability;
 			}
 			else if (depth == 0) {
@@ -364,6 +467,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 				}
 			}
 			else {
+			
 				return Color(0.0);
 			}
 		} break;
@@ -450,6 +554,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 			}
 			}break;
 		case TRANSLUCENT: {
+
 			Ray reflection_ray = Ray(hitpoint, ray.dir - normal * 2.0 * Dot(normal, ray.dir));
 			// 反射方向からの直接光サンプリングする
 			Intersection llintersect;
@@ -528,39 +633,17 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 					Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(reflection_ray, medium, rng, depth + 1, maxDepth) * Re
 						+ radiance(refraction_ray, next_medium, rng, depth + 1, maxDepth) * Tr)) / (1.0 - scattering_probability) / russian_roulette_probability;
 			}
+
 		} break;
+
 	}
 	}
 
 	Assertion(false, "Error!!");
 }
 
-inline double clamp(double x) {
-	if (x < 0.0)
-		return 0.0;
-	if (x > 1.0)
-		return 1.0;
-	return x;
-}
 
-inline int to_int(double x) {
-	return int(pow(clamp(x), 1 / 2.2) * 255 + 0.5);
-}
 
-// PPMファイルの保存
-void save_ppm_file(const std::string &filename, const Color *image, const int width, const int height) {
-	std::ofstream writer(filename.c_str(), std::ios::out);
-	writer << "P3" << std::endl;
-	writer << width << " " << height << std::endl;
-	writer << 255 << std::endl;
-	for (int i = 0; i < width * height; i++) {
-		const int r = to_int(image[i].x);
-		const int g = to_int(image[i].y);
-		const int b = to_int(image[i].z);
-		writer << r << " " << g << " " << b << " ";
-	}
-	writer.close();
-}
 
 void save_box_obj(const std::string &filename,Vec *v) {
 	std::ofstream writer(filename.c_str(), std::ios::out);
@@ -569,7 +652,7 @@ void save_box_obj(const std::string &filename,Vec *v) {
 	for (int i = 0; i <8 ; i++) {
 		writer << "v" << " " << std::fixed << std::setprecision(5) << (float)(v[i].x) << " " << std::fixed << std::setprecision(5) << (float)(v[i].y) << " " << std::fixed << std::setprecision(5) << (float)(v[i].z) << std::endl;
 	}
-	
+
 	writer << "vn -1.0000 0.0000 0.0000" << std::endl;
 	writer << "vn 0.0000 0.0000 -1.0000" << std::endl;
 		writer<< "vn 1.0000 0.0000 0.0000" << std::endl; 
@@ -662,7 +745,7 @@ inline void objectload(int i , std::vector<std::string> strList) {
 								triangles[i][f].mat =redMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 							else if (i == 2) {
-								triangles[i][f].mat = blueMat;//TODO 各オブジェクトについて変更できるようにする
+								triangles[i][f].mat = greenMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 							else if (i == 3) {
 								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
@@ -674,7 +757,10 @@ inline void objectload(int i , std::vector<std::string> strList) {
 								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 							else if (i == 6) {
-								triangles[i][f].mat =skinMat;//TODO 各オブジェクトについて変更できるようにする
+								triangles[i][f].mat =grayMat;//TODO 各オブジェクトについて変更できるようにする
+							}
+							else if (i == 7) {
+								triangles[i][f].mat = grayMat;//TODO 各オブジェクトについて変更できるようにする
 							}
 			}
 
@@ -684,7 +770,8 @@ inline void objectload(int i , std::vector<std::string> strList) {
 			triangles[i][f].bbox[1][0] = std::max(std::max(triangles[i][f].v[0].x, triangles[i][f].v[1].x), triangles[i][f].v[2].x);
 			triangles[i][f].bbox[1][1] = std::max(std::max(triangles[i][f].v[0].y, triangles[i][f].v[1].y), triangles[i][f].v[2].y);
 			triangles[i][f].bbox[1][2] = std::max(std::max(triangles[i][f].v[0].z, triangles[i][f].v[1].z), triangles[i][f].v[2].z);
-			triangles[i][f].normal =(triangles[i][f].n[0] + triangles[i][f].n[1] + triangles[i][f].n[2]) / 3; /*Normalize(Cross((triangles[i][f].v[1]- triangles[i][f].v[0]), (triangles[i][f].v[2] - triangles[i][f].v[0])));*/ 
+			//triangles[i][f].normal =(triangles[i][f].n[0] + triangles[i][f].n[1] + triangles[i][f].n[2]) / 3; 
+			triangles[i][f].normal = Normalize(Cross((triangles[i][f].v[1]- triangles[i][f].v[0]), (triangles[i][f].v[2] - triangles[i][f].v[0])));
 			triangles[i][f].obj_id = i;
 			index_offset += fv;
 
@@ -698,9 +785,56 @@ inline void objectload(int i , std::vector<std::string> strList) {
 }
 
 
+
+
+
+inline double clamp(double x) {
+	if (x < 0.0)
+		return 0.0;
+	if (x > 1.0)
+		return 1.0;
+	return x;
+}
+
+inline int to_int(double x) {
+	return int(pow(clamp(x), 1 / 2.2) * 255 + 0.5);
+}
+
+// PPMファイルの保存
+void save_ppm_file(const std::string &filename, const Color *image, const int width, const int height) {
+	std::ofstream writer(filename.c_str(), std::ios::out);
+	writer << "P3" << std::endl;
+	writer << width << " " << height << std::endl;
+	writer << 255 << std::endl;
+	for (int i = 0; i < width * height; i++) {
+		const int r = to_int(image[i].x);
+		const int g = to_int(image[i].y);
+		const int b = to_int(image[i].z);
+		writer << r << " " << g << " " << b << " ";
+	}
+	writer.close();
+}
+
+
+void save_binary(const std::string &filename, const Color *image, const int width, const int height) {
+	std::ofstream writer(filename.c_str(), std::ios::out);
+	writer << width << " " << height << std::endl;
+	for (int i = 0; i < width * height; i++) {
+		const double r = image[i].x;
+		const double g = image[i].y;
+		const double b = image[i].z;
+		writer << r << " " << g << " " << b << "\n";
+	}
+	writer.close();
+}
+
+
+
+
 // メイン関数
 int main(int argc, char **argv) {
-	
+
+
 	triangles.resize(objList.size());
 
 	//scene
@@ -709,105 +843,162 @@ int main(int argc, char **argv) {
 		objectload(i, objList);
 
 	}
-	std::vector<TRIANGLE*> polygons;//BVHの関係で一次元配列で持たないといけない
-	for (int i = 0; i < triangles.size(); i++) {
-		for (int j = 0; j < triangles[i].size(); j++) {
-			polygons.push_back(&triangles[i][j]);
-		}
-	}
 
-	constructBVH(polygons);
-	
-
-	// コマンド引数のパース
-	int width = 640;
-	int height = 480;
-	int samples = 10;//100;
+		// コマンド引数のパース
+		int width = 640;
+		int height = 480;
+		int samples = 100;//100;
 		int maxDepth = 100;//25;
-	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "--width") == 0) {
-			width = std::atoi(argv[++i]);
+		for (int i = 1; i < argc; i++) {
+			if (strcmp(argv[i], "--width") == 0) {
+				width = std::atoi(argv[++i]);
+			}
+
+			if (strcmp(argv[i], "--height") == 0) {
+				height = std::atoi(argv[++i]);
+			}
+
+			if (strcmp(argv[i], "--samples") == 0) {
+				samples = std::atoi(argv[++i]);
+			}
+
+			if (strcmp(argv[i], "--depth") == 0) {
+				maxDepth = std::atoi(argv[++i]);
+			}
 		}
 
-		if (strcmp(argv[i], "--height") == 0) {
-			height = std::atoi(argv[++i]);
+
+
+	int flame  = 2;
+	std::vector<std::vector <Color>>images;
+	std::vector<std::vector <Color>>images_sq;
+	std::vector<std::vector<std::vector <Color>>>images_each_sample;
+
+	images.resize(flame);
+	images_sq.resize(flame);
+	images_each_sample.resize(flame);
+
+	for (int j = 0; j < flame; j++) {
+		images[j].resize(height*width);
+		images_sq[j].resize(height*width);
+		images_each_sample[j].resize(height*width);
+
+		//オブジェクトの動き
+		int OBJ_ID = 2;
+		if (j != 0) {
+			for (int k = 0; k < triangles[OBJ_ID].size(); k++) {
+				change_mat(&triangles[OBJ_ID][k], blueMat);
+			}
+		}
+		std::vector<TRIANGLE*> polygons;//BVHの関係で一次元配列で持たないといけない
+		for (int i = 0; i < triangles.size(); i++) {
+			for (int j = 0; j < triangles[i].size(); j++) {
+				polygons.push_back(&triangles[i][j]);
+			}
 		}
 
-		if (strcmp(argv[i], "--samples") == 0) {
-			samples = std::atoi(argv[++i]);
-		}
+		constructBVH(polygons);
 
-		if (strcmp(argv[i], "--depth") == 0) {
-			maxDepth = std::atoi(argv[++i]);
+		// パラメータの表示
+		printf("-- Parameters --\n");
+		printf("    Width: %d\n", width);
+		printf("   Height: %d\n", height);
+		printf("  Samples: %d\n", samples);
+		printf("Max depth: %d\n", maxDepth);
+		printf("\n");
+
+		// カメラ
+		const Vec camPos = 0.1 * Vec(49.0, 60.0, 295.6);
+		const Vec camDir = Normalize(Vec(-0.045, -0.042612, -1.0));
+		const Ray camera(camPos, camDir);
+
+		// スクリーンの基底ベクトル
+		const Vec cx = Vec(width * 0.5135 / height, 0.0, 0.0);
+		const Vec cy = Normalize(Cross(cx, camera.dir)) * 0.5135;
+		// レンダリングループ
+		auto image	  = std::make_unique<Color[]>(width * height);//平均値
+		auto image_sq = std::make_unique<Color[]>(width * height);//二乗平均値
+		std::atomic<int> progress(0);
+		std::mutex mtx;
+		const std::string outfile = std::string(OUTPUT_DIRECTORY) + "image"+std::to_string(j)+".ppm";
+		const std::string outfile_binary_ave = std::string(OUTPUT_DIRECTORY) + "ave" + std::to_string(j) + ".txt";
+		const std::string outfile_binary_sq_ave = std::string(OUTPUT_DIRECTORY) + "sq_ave" + std::to_string(j) + ".txt";
+		clock_t start = clock();
+
+
+		parallel_for(0, height, [&](int y) {
+			//int y = height - (yy + 1);
+			for (int x = 0; x < width; x++) {
+				// 乱数
+				Random rng(y * width + x);
+				// ピクセル色の初期化
+				Color &pixel = image[y * width + x];
+				Color &pixel_sq=image_sq[y * width + x];
+				pixel = Color(0.0, 0.0, 0.0);
+				pixel_sq = Color(0.0, 0.0, 0.0);
+
+				// サンプリング
+				for (int s = 0; s < samples; s++) {
+					images_each_sample[j][y * width + x].resize(samples);
+					// テントフィルターによってサンプリング
+					const double r1 = 2.0 * rng.next01();
+					const double r2 = 2.0 * rng.next01();
+					const double dx = r1 < 1.0 ? sqrt(r1) - 1.0 : 1.0 - sqrt(2.0 - r1);
+					const double dy = r2 < 1.0 ? sqrt(r2) - 1.0 : 1.0 - sqrt(2.0 - r2);
+					const double px = (x + dx + 0.5) / width - 0.5;
+					const double py = ((height - y - 1) + dy + 0.5) / height - 0.5;
+
+					// 放射輝度の計算
+					const Vec dir = cx * px + cy * py + camera.dir;
+					const Ray ray(camera.org + dir * 13.0, Normalize(dir));
+					const Color L = radiance(ray, Medium(), rng, 0, maxDepth);
+					Assertion(L.isValid(), "Radiance is invalid: (%f, %f %f)", L.x, L.y, L.z);
+
+					images_each_sample[j][y * width + x][s]=L;
+					pixel = pixel + L;
+					pixel_sq = pixel_sq + L*L;
+				}
+				pixel = pixel / samples;
+				pixel_sq = pixel_sq / samples;
+
+				images[j][y * width + x]=pixel;
+				images_sq[j][y * width + x] = pixel_sq;
+
+				// 進行度の表示
+				mtx.lock();
+				progressBar(++progress, width * height);
+				mtx.unlock();
+			}
+		});
+		//}
+		clock_t end = clock();
+		std::cout << (float)(end - start) / CLOCKS_PER_SEC << std::endl;
+		// PPMファイルを保存
+		save_ppm_file(outfile, image.get(), width, height);
+		save_binary(outfile_binary_ave, image.get(),width, height);
+		save_binary(outfile_binary_sq_ave, image_sq.get(), width, height);
+
+		if (j != 0) {
+			auto image_temp = std::make_unique<Color[]>(width * height);
+			auto image_temp_fxh = std::make_unique<Color[]>(width * height);
+			for (int y = 0; y < height;y++) {
+				for (int x = 0; x < width; x++) {
+					Color &pixel = image_temp[y * width + x];
+					Color &pixelxpixel = image_temp_fxh[y * width + x];
+
+					for (int s = 0; s < samples; s++) {
+						pixelxpixel = pixelxpixel + images_each_sample[j - 1][y * width + x][s] * images_each_sample[j][y * width + x][s];
+					}
+					pixelxpixel = pixelxpixel / samples;
+					pixel = images[j][y * width + x] - images[j-1][y * width + x];
+				}
+
+			}
+			save_ppm_file(std::string(OUTPUT_DIF) + "difference_" + std::to_string(j-1)+"_" + std::to_string(j) + ".ppm", image_temp.get(), width, height);
+			save_binary(std::string(OUTPUT_DIF) + "difference_fxh" + std::to_string(j) + "_" + std::to_string(j-1) + ".txt", image_temp_fxh.get(), width, height);
+
 		}
 	}
-
-	// パラメータの表示
-	printf("-- Parameters --\n");
-	printf("    Width: %d\n", width);
-	printf("   Height: %d\n", height);
-	printf("  Samples: %d\n", samples);
-	printf("Max depth: %d\n", maxDepth);
-	printf("\n");
-
-	// カメラ
-	const Vec camPos = 0.1 * Vec(49.0, 60.0, 295.6);
-	const Vec camDir = Normalize(Vec(-0.045,-0.042612, -1.0));
-	const Ray camera(camPos, camDir);
-
-	// スクリーンの基底ベクトル
-	const Vec cx = Vec(width * 0.5135 / height, 0.0, 0.0);
-	const Vec cy = Normalize(Cross(cx, camera.dir)) * 0.5135;
-
-	// レンダリングループ
-	auto image = std::make_unique<Color[]>(width * height);
-	std::atomic<int> progress(0);
-	std::mutex mtx;
-	const std::string outfile = std::string(OUTPUT_DIRECTORY) + "image.ppm";
-	clock_t start = clock();
-
-	parallel_for(0, height, [&](int yy) {
-		int y = height - (yy+1);
-		for (int x = 0; x < width; x++) {
-			// 乱数
-			Random rng(y * width + x);
-
-			// ピクセル色の初期化
-			Color &pixel = image[y * width + x];
-			pixel = Color(0.0, 0.0, 0.0);
-
-			// サンプリング
-			for (int s = 0; s < samples; s++) {
-				// テントフィルターによってサンプリング
-				const double r1 = 2.0 * rng.next01();
-				const double r2 = 2.0 * rng.next01();
-				const double dx = r1 < 1.0 ? sqrt(r1) - 1.0 : 1.0 - sqrt(2.0 - r1);
-				const double dy = r2 < 1.0 ? sqrt(r2) - 1.0 : 1.0 - sqrt(2.0 - r2);
-				const double px = (x + dx + 0.5) / width - 0.5;
-				const double py = ((height - y - 1) + dy + 0.5) / height - 0.5;
-
-				// 放射輝度の計算
-				const Vec dir = cx * px + cy * py + camera.dir;
-				const Ray ray(camera.org + dir * 13.0, Normalize(dir));
-				const Color L = radiance(ray, Medium(), rng, 0, maxDepth);
-				Assertion(L.isValid(), "Radiance is invalid: (%f, %f %f)", L.x, L.y, L.z);
-
-				pixel = pixel + L;
-			}
-			pixel = pixel / samples;
-
-			// 進行度の表示
-			mtx.lock();
-			progressBar(++progress, width * height);
-			mtx.unlock();
-		}
-
-		save_ppm_file(outfile, image.get(), width, height);
-		});
-	//}
-	clock_t end = clock();
-	std::cout << (float)(end - start) / CLOCKS_PER_SEC << std::endl;
-	// PPMファイルを保存
-	save_ppm_file(outfile, image.get(), width, height);
+	printf("finish\n");
 	system("pause");
 }

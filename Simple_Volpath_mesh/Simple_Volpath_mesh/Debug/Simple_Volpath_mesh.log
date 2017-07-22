@@ -1,0 +1,34 @@
+﻿  main.cpp
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(22): warning C4305: '=': 'const double' から 'float' へ切り詰めます。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(23): warning C4305: '=': 'const double' から 'float' へ切り詰めます。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(84): warning C4244: '引数': 'const double' から 'const float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\bvh.h(87): warning C4018: '<=': signed と unsigned の数値を比較しようとしました。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(14): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(15): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(16): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(17): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(18): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\move.h(19): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(50): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(247): warning C4244: 'return': 'double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(270): warning C4244: 'return': 'double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(722): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(725): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(767): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(768): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(769): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(770): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(771): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(772): warning C4244: '=': 'const double' から 'float' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(824): warning C4244: '初期化中': 'const double' から 'int' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(824): warning C4244: '初期化中': 'const double' から 'const int' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(825): warning C4244: '初期化中': 'const double' から 'int' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(825): warning C4244: '初期化中': 'const double' から 'const int' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(826): warning C4244: '初期化中': 'const double' から 'int' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(826): warning C4244: '初期化中': 'const double' から 'const int' への変換です。データが失われる可能性があります。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(842): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(888): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(893): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+c:\users\tomoya\documents\github\simple_volpath_mesh\src\main.cpp(894): warning C4018: '<': signed と unsigned の数値を比較しようとしました。
+  Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\Simple_Volpath_mesh\Debug\Simple_Volpath_mesh.exe
+  Simple_Volpath_mesh.vcxproj -> C:\Users\tomoya\Documents\GitHub\Simple_Volpath_mesh\Simple_Volpath_mesh\Debug\Simple_Volpath_mesh.pdb (Partial PDB)
