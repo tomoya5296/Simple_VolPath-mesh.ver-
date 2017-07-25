@@ -291,7 +291,6 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	}
 	
 
-
 	// 最低バウンスを評価一定以上レイを追跡したらロシアンルーレットを実行し追跡を打ち切るかどうかを判断する
 	double russian_roulette_probability = std::max(obj.mat.ref.x, std::max(obj.mat.ref.y, obj.mat.ref.z));
 	russian_roulette_probability = std::max(0.05, russian_roulette_probability);
