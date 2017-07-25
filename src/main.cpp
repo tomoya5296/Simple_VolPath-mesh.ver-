@@ -295,29 +295,26 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 	// 最低バウンスを評価一定以上レイを追跡したらロシアンルーレットを実行し追跡を打ち切るかどうかを判断する
 	double russian_roulette_probability = std::max(obj.mat.ref.x, std::max(obj.mat.ref.y, obj.mat.ref.z));
 	russian_roulette_probability = std::max(0.05, russian_roulette_probability);
-    if (depth > 100) {
-        if (rng.next01() > russian_roulette_probability) {
-            Vec direct_light;
-            if (obj.obj_id != LightID) {
-                const int shadow_ray = 1;
-                for (int i = 0; i < shadow_ray; i++) {
-                    direct_light = direct_light + direct_radiance_sample(hitpoint, orienting_normal, &obj, rng.next01(), rng.next01(), rng.next01()) / shadow_ray;
-                }
-                return direct_light/ (1.0 - russian_roulette_probability);
-            }
-            else {
-                if (Dot(-ray.dir, normal) > 0.0) {
-                    return obj.mat.Le / (1.0 - russian_roulette_probability);
-                }
-                else {
-                    return Color(0.0);
-                }
-            }
-
-
-
-        }
-    }
+	if (depth > 15 ) {
+		if (rng.next01() > russian_roulette_probability) {
+		/*	Vec direct_light;
+			if (obj.obj_id != LightID) {
+				const int shadow_ray = 1;
+				for (int i = 0; i < shadow_ray; i++) {
+					direct_light = direct_light + direct_radiance_sample(hitpoint, orienting_normal, &obj, rng.next01(), rng.next01(), rng.next01()) / shadow_ray;
+				}
+				return direct_light/ (1.0 - russian_roulette_probability);
+			}*/
+			//else {
+				/*if (Dot(-ray.dir, normal) > 0.0) {
+					return obj.mat.Le / (1.0 - russian_roulette_probability);
+				}
+				else {*/
+					return Color(0.0);
+				//}
+		//	}
+		}
+	}
 	else {
 		russian_roulette_probability = 1.0;
 	}
@@ -469,7 +466,7 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 				const double r2 = rng.next01();
 				const double r2s = sqrt(r2);
 				Vec dir = Normalize((u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1.0 - r2)));
-				return /*direct_light+*/Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(Ray(hitpoint, dir), medium, rng, depth + 1, maxDepth))) / (1.0 - scattering_probability) / russian_roulette_probability;
+				return direct_light+Multiply(transmittance_ratio, Multiply(obj.mat.ref, radiance(Ray(hitpoint, dir), medium, rng, depth + 1, maxDepth))) / (1.0 - scattering_probability) / russian_roulette_probability;
 			}
 			else if (depth == 0) {
 				if (Dot(-ray.dir,obj.normal)>0.0) {
@@ -480,13 +477,13 @@ Color radiance(const Ray &ray, const Medium &medium, Random &rng, int depth, int
 				}
 			}
 			else {
-                if (Dot(-ray.dir, obj.normal)>0.0) {
-                    return obj.mat.Le;
-                }
-                else {
-                    return Color(0.0);
-                }
-				//return Color(0.0);
+				/*if (Dot(-ray.dir, obj.normal)>0.0) {
+					return obj.mat.Le;
+				}
+				else {
+					return Color(0.0);
+				}*/
+				return Color(0.0);
 			}
 		} break;
 
@@ -887,7 +884,7 @@ int main(int argc, char **argv) {
 
 
 
-	int flame  = 2;
+	int flame  = 1;
 	std::vector<std::vector <Color>>images;
 	std::vector<std::vector <Color>>images_sq;
 	std::vector<std::vector<std::vector <Color>>>images_each_sample;
